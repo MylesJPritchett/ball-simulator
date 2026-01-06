@@ -6,8 +6,8 @@ from sim.world import World
 from sim.rules import on_collision
 from sim.rng import seed_all
 from sim.vector import vec
-from render.renderer import Renderer
-from render.palette import random_color
+from renderer.renderer import Renderer
+from renderer.palette import random_color
 import config
 
 

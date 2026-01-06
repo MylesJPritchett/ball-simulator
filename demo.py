@@ -101,7 +101,7 @@ def main(seed=0):
                         Ball(
                             b.pos.copy(),
                             new_vel,
-                            max(20, b.radius * 0.9),
+                            b.radius * 1.05,
                             random_color(),
                             b.generation + 1,
                         )

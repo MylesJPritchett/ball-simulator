@@ -6,7 +6,7 @@ import math
 # ---------------- CONFIG ----------------
 WIDTH, HEIGHT = 800, 800
 FPS = 60
-DURATION = 8  # seconds
+DURATION = 20  # seconds
 MAX_BALLS = 200
 
 CIRCLE_RADIUS = 360
@@ -57,7 +57,7 @@ def main(seed=0):
         Ball(
             CENTER + np.array([50, 0], dtype=float),
             np.array([180, 220], dtype=float),
-            6,
+            30,
             random_color(),
         )
     ]
@@ -101,7 +101,7 @@ def main(seed=0):
                         Ball(
                             b.pos.copy(),
                             new_vel,
-                            max(3, b.radius * 0.9),
+                            max(20, b.radius * 0.9),
                             random_color(),
                             b.generation + 1,
                         )

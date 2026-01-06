@@ -64,8 +64,15 @@ def main(seed=0):
 
     trail = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
 
+    running = True
     frames = FPS * DURATION
     for _ in range(frames):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+        if not running:
+            break
+
         screen.fill((10, 10, 10))
         trail.fill((0, 0, 0, 40))
 
@@ -76,6 +83,7 @@ def main(seed=0):
             hit, normal = b.check_collision()
 
             if hit:
+                b.pos = CENTER + normal * (CIRCLE_RADIUS - b.radius)
                 b.vel = reflect(b.vel, normal) * SPEED_BOOST
                 b.color = random_color()
 

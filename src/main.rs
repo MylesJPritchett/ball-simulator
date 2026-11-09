@@ -102,6 +102,11 @@ fn generate_batch(count: usize, batch_seed: Option<u64>, dir: &Path, out: &Path)
 }
 
 /// A batch Seed for runs that don't pass one; printed so the batch can be rerun.
+///
+/// Reading the clock is the one non-seeded input in the generator. ADR-0001
+/// (same Seed, same Video) still holds because this only picks the batch
+/// Seed, which `generate_batch` prints: every Video in the batch is derived
+/// from it and `--seed` reproduces the whole batch.
 fn clock_seed() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

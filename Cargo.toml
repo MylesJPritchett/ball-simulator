@@ -1,6 +1,6 @@
 [package]
 name = "ball-simulator"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Generates satisfying ball-bounce Videos from Scenarios and Seeds"
 

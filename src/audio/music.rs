@@ -168,7 +168,16 @@ impl Sound {
     pub fn pitch(&self, hit_index: usize, angle: f64, size: f64) -> f64 {
         let n = self.degrees();
         let degree = match self.pitch_mode {
-            PitchMode::Step => hit_index % n,
+            PitchMode::Step => {
+                // Up to the top and back down; neither turning note repeats.
+                let period = (2 * (n - 1)).max(1);
+                let phase = hit_index % period;
+                if phase < n {
+                    phase
+                } else {
+                    period - phase
+                }
+            }
             PitchMode::Angle => {
                 let turn = (angle + std::f64::consts::PI) / std::f64::consts::TAU;
                 ((turn * n as f64) as usize).min(n - 1)

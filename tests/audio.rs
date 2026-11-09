@@ -42,15 +42,18 @@ fn with_sound(sound: &str) -> String {
 }
 
 #[test]
-fn default_pitch_mode_walks_up_the_scale_one_step_per_hit_and_wraps() {
-    // Fast ball: plenty of hits to wrap at least once.
+fn default_pitch_mode_climbs_the_scale_and_turns_around_at_each_end() {
+    // Fast ball: plenty of hits to turn at the top and again at the bottom.
     let fast =
         with_sound("scale = \"major_pentatonic\"").replace("speed = 900.0", "speed = 6000.0");
     let record = run(&fast, 3);
 
     assert_eq!(record.sound.pitch_mode.name(), "step");
-    // Two octaves of major pentatonic, then back to the root.
-    let expected = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 0, 2, 4];
+    // Two octaves of major pentatonic up, back down to the root, and up again.
+    // Neither turning note repeats.
+    let expected = [
+        0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 19, 16, 14, 12, 9, 7, 4, 2, 0, 2, 4,
+    ];
     assert!(record.boundary_hits.len() >= expected.len());
     for (hit, want) in record.boundary_hits.iter().zip(expected) {
         assert_eq!(semitones(&record, hit.pitch), want);

@@ -26,6 +26,10 @@ min_radius = 280.0                # stops shrinking here
 [[rules]]
 kind = "change_colour"
 
+# Every Boundary Hit plays a note.
+[[rules]]
+kind = "play_note"
+
 [end_condition]
 kind = "time_cap"
 

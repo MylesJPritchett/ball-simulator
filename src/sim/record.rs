@@ -53,6 +53,9 @@ pub struct BoundaryHit {
     pub speed: f64,
     /// The ball's palette colour index after on-hit Rules ran.
     pub colour: u32,
+    /// Whether this hit's note sounds (set by the `play_note` Rule). The pitch
+    /// is assigned either way.
+    pub plays_note: bool,
 }
 
 impl BoundaryHit {

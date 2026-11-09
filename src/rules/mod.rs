@@ -12,6 +12,7 @@ mod change_colour;
 mod drag;
 mod gravity;
 mod grow;
+mod play_note;
 mod shrink;
 mod shrinking_arena;
 mod speed_up;
@@ -49,7 +50,7 @@ pub trait Rule {
         &mut self,
         _world: &mut World,
         _ball: usize,
-        _hit: &BoundaryHit,
+        _hit: &mut BoundaryHit,
         _ctx: &mut RuleContext,
     ) {
     }
@@ -66,6 +67,7 @@ pub fn build(spec: &RuleSpec) -> Result<Box<dyn Rule>, String> {
         "split" => Ok(Box::new(split::Split::from_spec(spec)?)),
         "grow" => Ok(Box::new(grow::Grow::from_spec(spec)?)),
         "shrink" => Ok(Box::new(shrink::Shrink::from_spec(spec)?)),
+        "play_note" => Ok(Box::new(play_note::PlayNote::from_spec(spec)?)),
         other => Err(format!("unknown Rule '{other}'")),
     }
 }

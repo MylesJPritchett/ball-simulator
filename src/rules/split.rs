@@ -52,7 +52,7 @@ impl Rule for Split {
         &mut self,
         world: &mut World,
         ball: usize,
-        _hit: &BoundaryHit,
+        _hit: &mut BoundaryHit,
         _ctx: &mut RuleContext,
     ) {
         let parent = world.balls[ball].clone();

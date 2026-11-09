@@ -200,6 +200,7 @@ impl Simulation {
                         pitch,
                         speed: ball.vel.length(),
                         colour: ball.colour,
+                        plays_note: false,
                     },
                 ));
             }
@@ -207,7 +208,7 @@ impl Simulation {
 
         for (index, mut hit) in hits {
             for rule in &mut self.rules {
-                rule.on_boundary_hit(&mut self.world, index, &hit, &mut ctx);
+                rule.on_boundary_hit(&mut self.world, index, &mut hit, &mut ctx);
                 // Population Cap: drop balls a Rule just added beyond the cap. The
                 // count was within the cap before this hit, so only new balls go
                 // and pending hit indices stay valid.

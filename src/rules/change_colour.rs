@@ -24,7 +24,7 @@ impl Rule for ChangeColour {
         &mut self,
         world: &mut World,
         ball: usize,
-        _hit: &BoundaryHit,
+        _hit: &mut BoundaryHit,
         _ctx: &mut RuleContext,
     ) {
         // Render wraps the index to the palette length, so cycling through any

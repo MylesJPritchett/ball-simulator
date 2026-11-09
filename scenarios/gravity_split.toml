@@ -29,6 +29,10 @@ spread = { min = 4.0, max = 7.0 }
 [[rules]]
 kind = "change_colour"
 
+# Every Boundary Hit plays a note.
+[[rules]]
+kind = "play_note"
+
 [end_condition]
 kind = "population_cap"
 

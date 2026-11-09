@@ -35,7 +35,7 @@ impl Rule for SpeedUp {
         &mut self,
         world: &mut World,
         ball: usize,
-        _hit: &BoundaryHit,
+        _hit: &mut BoundaryHit,
         _ctx: &mut RuleContext,
     ) {
         let ball = &mut world.balls[ball];

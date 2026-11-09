@@ -20,6 +20,10 @@ percent = { min = 3.0, max = 5.0 }
 [[rules]]
 kind = "change_colour"
 
+# Every Boundary Hit plays a note.
+[[rules]]
+kind = "play_note"
+
 [end_condition]
 kind = "time_cap"
 

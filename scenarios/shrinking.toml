@@ -22,6 +22,10 @@ min_radius = 10.0
 kind = "speed_up"
 percent = { min = 1.5, max = 2.5 }
 
+# Every Boundary Hit plays a note.
+[[rules]]
+kind = "play_note"
+
 [end_condition]
 kind = "time_cap"
 

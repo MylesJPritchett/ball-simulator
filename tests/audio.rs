@@ -125,6 +125,30 @@ fn angle_pitch_mode_rises_around_the_boundary() {
 }
 
 #[test]
+fn boundary_hits_play_notes_only_with_the_play_note_rule() {
+    use ball_simulator::audio::{voices, SAMPLES_PER_SUBSTEP};
+    let silent = run(MINIMAL, 3);
+    let playing = run(&format!("{MINIMAL}\n[[rules]]\nkind = \"play_note\"\n"), 3);
+    assert!(!silent.boundary_hits.is_empty());
+    assert_eq!(silent.boundary_hits, {
+        let mut hits = playing.boundary_hits.clone();
+        hits.iter_mut().for_each(|h| h.plays_note = false);
+        hits
+    });
+
+    let hit_notes = |record: &SimRecord| {
+        let chord_at = (record.ending.start_substep * SAMPLES_PER_SUBSTEP) as usize;
+        voices(record).iter().filter(|v| v.start != chord_at).count()
+    };
+    // Without the Rule, only the final chord sounds.
+    assert!(silent.boundary_hits.iter().all(|h| !h.plays_note));
+    assert_eq!(hit_notes(&silent), 0);
+    // With it, every Boundary Hit plays its assigned pitch.
+    assert!(playing.boundary_hits.iter().all(|h| h.plays_note && h.pitch > 0.0));
+    assert_eq!(hit_notes(&playing), playing.boundary_hits.len());
+}
+
+#[test]
 fn instrument_and_scale_vary_by_seed() {
     let mut instruments = std::collections::HashSet::new();
     let mut scales = std::collections::HashSet::new();

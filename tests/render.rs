@@ -1,5 +1,5 @@
 //! Rendered frames, through the renderer seam: a `Simulation` driven frame by
-//! frame and drawn once per frame, as the pipeline and preview do.
+//! frame and drawn once per frame with its Ending, as the pipeline and preview do.
 
 mod support;
 
@@ -10,16 +10,18 @@ use support::{scenario, MINIMAL};
 /// Width of the Boundary stroke as drawn (just outside the Arena's edge).
 const BOUNDARY_WIDTH: f32 = 6.0;
 
-/// Draws `frames` frames (frame 0 first), calling `each` on every frame.
+/// Draws `frames` frames (frame 0 first) with the run's Ending, calling
+/// `each` on every frame.
 fn draw_frames(toml: &str, seed: u64, frames: u64, mut each: impl FnMut(&Simulation, &[u8])) {
     let scenario = scenario(toml);
+    let ending = sim::run(&scenario, seed).ending;
     let mut sim = Simulation::new(&scenario, seed);
     let mut renderer = Renderer::new(sim.scenario());
     for k in 0..frames {
         if k > 0 {
             sim.step_frame();
         }
-        let frame = renderer.draw(&sim);
+        let frame = renderer.draw(&sim, Some(&ending));
         each(&sim, frame);
     }
 }
@@ -95,4 +97,28 @@ fn hit_glows_fade_out_during_the_ending_hold() {
         "a glow shows when the action freezes"
     );
     assert!(glowing_last == plain_last, "the glow faded during the hold");
+}
+
+#[test]
+fn the_ending_flashes_when_the_end_condition_fires_and_fades_before_the_cut() {
+    // The End Condition fires on frame 30.
+    let toml = MINIMAL.replace("time_cap = 5.0", "time_cap = 0.5");
+    // A corner pixel, away from the Arena and the text.
+    let brightness = |frame: &[u8]| pixel(frame, 2.0, 2.0).map(u32::from).iter().sum::<u32>();
+    let mut frames = Vec::new();
+    let mut dark = 0;
+    let ending = sim::run(&scenario(&toml), 1).ending;
+    draw_frames(&toml, 1, ending.frames(), |sim, frame| {
+        dark = sim.palette().background.map(u32::from).iter().sum();
+        frames.push(brightness(frame));
+    });
+
+    assert_eq!(frames[29], dark, "no flash during the action");
+    assert!(frames[30] > dark, "the flash starts as the action freezes");
+    assert!(frames[30] > frames[40], "the flash fades");
+    assert_eq!(
+        *frames.last().unwrap(),
+        dark,
+        "the flash has gone before the cut"
+    );
 }

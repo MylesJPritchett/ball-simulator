@@ -17,6 +17,7 @@ pub use quality_gate::{Rejection, Verdict};
 pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
 pub use world::{Arena, Ball, Vec2, World};
 
+use crate::audio::music::Sound;
 use crate::look::{palette, Palette};
 use crate::rules::{self, Rule, RuleContext};
 use crate::scenario::{ResolvedParam, Scenario};
@@ -29,9 +30,6 @@ pub const FPS: u64 = 60;
 pub const SUBSTEPS_PER_FRAME: u64 = 8;
 /// Physics substep rate (480 Hz).
 pub const SUBSTEP_HZ: u64 = FPS * SUBSTEPS_PER_FRAME;
-
-/// Pitch for every Boundary Hit until pitch modes exist (A4).
-pub const DEFAULT_PITCH_HZ: f64 = 440.0;
 
 /// Runs a Scenario headlessly with a Seed until an End Condition fires.
 pub fn run(scenario: &Scenario, seed: u64) -> SimRecord {
@@ -47,6 +45,7 @@ pub struct Simulation {
     /// The Scenario with this Seed's ranges resolved.
     scenario: Scenario,
     parameters: Vec<ResolvedParam>,
+    sound: Sound,
     palette: &'static Palette,
     world: World,
     rules: Vec<Box<dyn Rule>>,
@@ -89,6 +88,9 @@ impl Simulation {
             ball.radius,
         );
 
+        // Own RNG stream: choosing the sound draws nothing from `rng`.
+        let sound = Sound::for_video(&scenario.sound, seed);
+
         let ball_count = vec![BallCountSample {
             substep: 0,
             count: world.balls.len(),
@@ -97,6 +99,7 @@ impl Simulation {
         Simulation {
             seed,
             parameters,
+            sound,
             palette: palette::for_video(scenario.look.palette.as_deref(), seed),
             world,
             rules,
@@ -177,16 +180,21 @@ impl Simulation {
 
         let completed = self.substep + 1;
         let mut hits = Vec::new();
+        let arena_radius = self.world.arena.radius;
         for (index, ball) in self.world.balls.iter_mut().enumerate() {
             ball.pos += ball.vel * dt;
             if let Some(angle) = resolve_boundary(ball, &self.world.arena) {
+                let hit_index = self.boundary_hits.len() + hits.len();
+                let pitch = self
+                    .sound
+                    .pitch(hit_index, angle, ball.radius / arena_radius);
                 hits.push((
                     index,
                     BoundaryHit {
                         substep: completed,
                         ball_id: ball.id,
                         angle,
-                        pitch: DEFAULT_PITCH_HZ,
+                        pitch,
                         speed: ball.vel.length(),
                         colour: ball.colour,
                     },
@@ -205,6 +213,8 @@ impl Simulation {
             hit.colour = self.world.balls[index].colour;
             self.boundary_hits.push(hit);
         }
+        // Rules may have grown balls past the Boundary.
+        self.world.contain();
         self.world.limit_speed(self.max_speed);
 
         self.substep = completed;
@@ -252,6 +262,7 @@ impl Simulation {
         let mut record = SimRecord {
             seed: self.seed,
             parameters: self.parameters,
+            sound: self.sound,
             palette: self.palette.name.to_string(),
             final_state_hash: hash_world(&self.world, self.substep),
             final_arena_radius: self.world.arena.radius,

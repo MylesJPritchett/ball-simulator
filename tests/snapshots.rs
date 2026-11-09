@@ -80,6 +80,17 @@ fn faster_every_bounce_seed_1() {
 }
 
 #[test]
+fn growing_seed_1() {
+    let record = sim::run(&shipped("growing"), 1);
+
+    assert_eq!(record.end.condition, "arena_filled");
+    assert_eq!(record.end.substep, 15977);
+    assert_eq!(record.boundary_hits.len(), 70);
+    assert_eq!(record.final_balls[0].radius, 460.0);
+    assert_eq!(record.final_state_hash, 7036276404711173298);
+}
+
+#[test]
 fn shrinking_arena_seed_1() {
     let record = sim::run(&shipped("shrinking_arena"), 1);
 

@@ -11,6 +11,8 @@
 mod change_colour;
 mod drag;
 mod gravity;
+mod grow;
+mod shrink;
 mod shrinking_arena;
 mod speed_up;
 mod split;
@@ -62,6 +64,8 @@ pub fn build(spec: &RuleSpec) -> Result<Box<dyn Rule>, String> {
         "change_colour" => Ok(Box::new(change_colour::ChangeColour::from_spec(spec)?)),
         "shrinking_arena" => Ok(Box::new(shrinking_arena::ShrinkingArena::from_spec(spec)?)),
         "split" => Ok(Box::new(split::Split::from_spec(spec)?)),
+        "grow" => Ok(Box::new(grow::Grow::from_spec(spec)?)),
+        "shrink" => Ok(Box::new(shrink::Shrink::from_spec(spec)?)),
         other => Err(format!("unknown Rule '{other}'")),
     }
 }

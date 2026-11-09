@@ -116,6 +116,23 @@ impl World {
         }
     }
 
+    /// Keeps every ball inside the Arena after Rules have changed radii: a
+    /// ball is never larger than the Arena, and one poking past the Boundary
+    /// is moved straight inward until it touches it. Velocity is unchanged.
+    pub fn contain(&mut self) {
+        let arena_radius = self.arena.radius;
+        for ball in &mut self.balls {
+            ball.radius = ball.radius.min(arena_radius);
+            let limit = arena_radius - ball.radius;
+            let dist = ball.pos.length();
+            // The tolerance leaves balls that Boundary resolution already
+            // placed on the Boundary untouched (bit for bit).
+            if dist > limit + 1e-9 {
+                ball.pos = ball.pos * (limit / dist);
+            }
+        }
+    }
+
     /// Adds a ball with a fresh id and returns its index in `balls`.
     pub fn spawn(&mut self, pos: Vec2, vel: Vec2, radius: f64) -> usize {
         let id = self.next_ball_id;

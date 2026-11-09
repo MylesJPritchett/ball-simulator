@@ -145,7 +145,7 @@ pub fn downscale_to_rgb32(rgba: &[u8], width: u32, height: u32, factor: u32) -> 
             let mut sum = [0u32; 3];
             for y in oy * f..(oy + 1) * f {
                 let row = &rgba[(y * w + ox * f) * 4..(y * w + (ox + 1) * f) * 4];
-                for px in row.chunks_exact(4) {
+                for px in row.as_chunks::<4>().0 {
                     for (s, &c) in sum.iter_mut().zip(px) {
                         *s += c as u32;
                     }

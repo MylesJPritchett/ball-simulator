@@ -155,15 +155,17 @@ impl Simulation {
                         angle,
                         pitch: DEFAULT_PITCH_HZ,
                         speed: ball.vel.length(),
+                        colour: ball.colour,
                     },
                 ));
             }
         }
 
-        for (index, hit) in hits {
+        for (index, mut hit) in hits {
             for rule in &mut self.rules {
                 rule.on_boundary_hit(&mut self.world, index, &hit, &mut ctx);
             }
+            hit.colour = self.world.balls[index].colour;
             self.boundary_hits.push(hit);
         }
         self.world.limit_speed(self.max_speed);

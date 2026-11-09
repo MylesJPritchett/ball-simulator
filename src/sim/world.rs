@@ -78,6 +78,8 @@ pub struct Ball {
     pub pos: Vec2,
     pub vel: Vec2,
     pub radius: f64,
+    /// Index into the Video's palette (render wraps it to the palette length).
+    pub colour: u32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -115,6 +117,7 @@ impl World {
             pos,
             vel,
             radius,
+            colour: 0,
         });
         self.balls.len() - 1
     }

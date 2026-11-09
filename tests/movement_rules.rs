@@ -90,6 +90,26 @@ fn gravity_cannot_push_a_ball_past_max_speed() {
 }
 
 #[test]
+fn change_colour_recolours_the_ball_on_each_boundary_hit() {
+    let toml = format!("{MINIMAL}\n[[rules]]\nkind = \"change_colour\"\n");
+    let record = run(&toml, 7);
+
+    assert!(record.boundary_hits.len() >= 3);
+    // The ball starts in colour 0, so the first hit must already change it.
+    assert_ne!(record.boundary_hits[0].colour, 0);
+    for pair in record.boundary_hits.windows(2) {
+        assert_ne!(pair[0].colour, pair[1].colour);
+    }
+}
+
+#[test]
+fn without_change_colour_the_ball_keeps_its_colour() {
+    let record = run(MINIMAL, 7);
+
+    assert!(record.boundary_hits.iter().all(|h| h.colour == 0));
+}
+
+#[test]
 fn at_max_speed_a_ball_never_ends_a_substep_outside_the_arena() {
     // 30000 units/s at 480 Hz is ~62 units per substep, over twice the ball's radius.
     let fast = MINIMAL.replace("speed = 900.0", "speed = 30000.0\nmax_speed = 30000.0")

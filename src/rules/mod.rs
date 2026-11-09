@@ -8,6 +8,7 @@
 //! Rules must be deterministic: any randomness comes from `ctx.rng`, never from
 //! the clock, a thread RNG or hash-map iteration order.
 
+mod change_colour;
 mod drag;
 mod gravity;
 mod speed_up;
@@ -56,6 +57,7 @@ pub fn build(spec: &RuleSpec) -> Result<Box<dyn Rule>, String> {
         "gravity" => Ok(Box::new(gravity::Gravity::from_spec(spec)?)),
         "drag" => Ok(Box::new(drag::Drag::from_spec(spec)?)),
         "speed_up" => Ok(Box::new(speed_up::SpeedUp::from_spec(spec)?)),
+        "change_colour" => Ok(Box::new(change_colour::ChangeColour::from_spec(spec)?)),
         other => Err(format!("unknown Rule '{other}'")),
     }
 }

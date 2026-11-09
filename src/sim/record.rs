@@ -36,6 +36,8 @@ pub struct BoundaryHit {
     pub pitch: f64,
     /// The ball's speed at impact (before on-hit Rules), in units per second.
     pub speed: f64,
+    /// The ball's palette colour index after on-hit Rules ran.
+    pub colour: u32,
 }
 
 impl BoundaryHit {

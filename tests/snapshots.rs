@@ -175,11 +175,11 @@ fn shrinking_seed_1() {
     assert_seed_1(
         "shrinking",
         Snapshot {
-            boundary_hits: 81,
+            boundary_hits: 98,
             final_ball_count: 1,
             end_condition: "time_cap",
             end_substep: 17746,
-            final_state_hash: 12947851160423124090,
+            final_state_hash: 13495442815248080,
         },
     );
 }

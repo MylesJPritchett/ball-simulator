@@ -25,6 +25,10 @@ kind = "split"
 into = 2
 spread = { min = 4.0, max = 7.0 }
 
+# Children inherit their parent's colour, so this mixes the swarm's colours.
+[[rules]]
+kind = "change_colour"
+
 [end_condition]
 kind = "population_cap"
 

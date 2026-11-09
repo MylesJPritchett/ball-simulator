@@ -213,6 +213,8 @@ impl Simulation {
             hit.colour = self.world.balls[index].colour;
             self.boundary_hits.push(hit);
         }
+        // Rules may have grown balls past the Boundary.
+        self.world.contain();
         self.world.limit_speed(self.max_speed);
 
         self.substep = completed;

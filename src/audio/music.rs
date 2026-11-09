@@ -9,6 +9,8 @@
 //! [sound]
 //! instrument = "pluck"          # "sine_bell" | "pluck" | "marimba"; omitted = Seed chooses
 //! scale = "dorian"              # "major_pentatonic" | "minor_pentatonic" | "lydian" | "dorian"
+//!                               # | "mixolydian" | "aeolian" | "suspended_pentatonic" | "hirajoshi";
+//!                               # omitted = Seed chooses
 //! pitch_mode = "angle"          # "step" (default) | "ball_size" | "angle"
 //! ```
 
@@ -43,14 +45,22 @@ pub enum Scale {
     MinorPentatonic,
     Lydian,
     Dorian,
+    Mixolydian,
+    Aeolian,
+    SuspendedPentatonic,
+    Hirajoshi,
 }
 
 impl Scale {
-    pub const ALL: [Scale; 4] = [
+    pub const ALL: [Scale; 8] = [
         Scale::MajorPentatonic,
         Scale::MinorPentatonic,
         Scale::Lydian,
         Scale::Dorian,
+        Scale::Mixolydian,
+        Scale::Aeolian,
+        Scale::SuspendedPentatonic,
+        Scale::Hirajoshi,
     ];
 
     pub fn name(self) -> &'static str {
@@ -59,6 +69,10 @@ impl Scale {
             Scale::MinorPentatonic => "minor_pentatonic",
             Scale::Lydian => "lydian",
             Scale::Dorian => "dorian",
+            Scale::Mixolydian => "mixolydian",
+            Scale::Aeolian => "aeolian",
+            Scale::SuspendedPentatonic => "suspended_pentatonic",
+            Scale::Hirajoshi => "hirajoshi",
         }
     }
 
@@ -69,14 +83,19 @@ impl Scale {
             Scale::MinorPentatonic => &[0, 3, 5, 7, 10],
             Scale::Lydian => &[0, 2, 4, 6, 7, 9, 11],
             Scale::Dorian => &[0, 2, 3, 5, 7, 9, 10],
+            Scale::Mixolydian => &[0, 2, 4, 5, 7, 9, 10],
+            Scale::Aeolian => &[0, 2, 3, 5, 7, 8, 10],
+            Scale::SuspendedPentatonic => &[0, 2, 5, 7, 10],
+            Scale::Hirajoshi => &[0, 2, 3, 7, 8],
         }
     }
 
     /// The final chord, in semitones above the root (all in the scale).
     pub fn chord(self) -> &'static [i32] {
         match self {
-            Scale::MajorPentatonic | Scale::Lydian => &[-12, 0, 4, 7, 12],
-            Scale::MinorPentatonic => &[-12, 0, 3, 7, 12],
+            Scale::MajorPentatonic | Scale::Lydian | Scale::Mixolydian => &[-12, 0, 4, 7, 12],
+            Scale::MinorPentatonic | Scale::Aeolian | Scale::Hirajoshi => &[-12, 0, 3, 7, 12],
+            Scale::SuspendedPentatonic => &[-12, 0, 7, 12],
             Scale::Dorian => &[-12, 0, 3, 7, 10],
         }
     }
@@ -91,7 +110,8 @@ impl Scale {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PitchMode {
-    /// A global step counter: each Boundary Hit is the next degree up, wrapping.
+    /// A global step counter: each Boundary Hit is the next degree up, turning
+    /// around at the top and bottom of the range.
     #[default]
     Step,
     /// Bigger balls play lower notes.
@@ -168,7 +188,16 @@ impl Sound {
     pub fn pitch(&self, hit_index: usize, angle: f64, size: f64) -> f64 {
         let n = self.degrees();
         let degree = match self.pitch_mode {
-            PitchMode::Step => hit_index % n,
+            PitchMode::Step => {
+                // Up to the top and back down; neither turning note repeats.
+                let period = (2 * (n - 1)).max(1);
+                let phase = hit_index % period;
+                if phase < n {
+                    phase
+                } else {
+                    period - phase
+                }
+            }
             PitchMode::Angle => {
                 let turn = (angle + std::f64::consts::PI) / std::f64::consts::TAU;
                 ((turn * n as f64) as usize).min(n - 1)

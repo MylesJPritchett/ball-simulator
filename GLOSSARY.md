@@ -54,3 +54,10 @@ _Avoid_: Collision, bounce, edge hit
 
 **Voice**:
 One currently sounding note; the number of simultaneous Voices is capped to keep audio clean.
+
+**Scale**:
+The set of notes a Video's Boundary Hits can play, chosen by the Seed unless the Scenario pins one.
+_Avoid_: Key, mode
+
+**Pitch Mode**:
+How a Boundary Hit's note is picked from the Scale: stepping up and back down it, by where the hit lands on the Boundary, or by ball size.

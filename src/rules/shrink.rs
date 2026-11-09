@@ -10,7 +10,7 @@
 
 use serde::Deserialize;
 
-use super::{params, Rule, RuleContext};
+use super::{params, positive_finite, Rule, RuleContext};
 use crate::scenario::RuleSpec;
 use crate::sim::{BoundaryHit, SimState};
 
@@ -37,15 +37,9 @@ pub struct Shrink {
 impl Shrink {
     pub fn from_spec(spec: &RuleSpec) -> Result<Self, String> {
         let p: Params = params(spec)?;
-        if !(p.amount.is_finite() && p.amount > 0.0) {
-            return Err("Rule 'shrink': amount must be a finite number > 0".into());
-        }
-        if !(p.min_radius.is_finite() && p.min_radius > 0.0) {
-            return Err("Rule 'shrink': min_radius must be a finite number > 0".into());
-        }
         Ok(Shrink {
-            amount: p.amount,
-            min_radius: p.min_radius,
+            amount: positive_finite(spec, "amount", p.amount)?,
+            min_radius: positive_finite(spec, "min_radius", p.min_radius)?,
         })
     }
 }

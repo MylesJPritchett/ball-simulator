@@ -2,7 +2,7 @@
 
 use serde::Deserialize;
 
-use super::{params, Rule, RuleContext};
+use super::{non_negative_finite, params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
 use crate::sim::SimState;
 
@@ -20,11 +20,8 @@ struct Params {
 impl Drag {
     pub fn from_spec(spec: &RuleSpec) -> Result<Self, String> {
         let p: Params = params(spec)?;
-        if !(p.strength.is_finite() && p.strength >= 0.0) {
-            return Err("Rule 'drag': strength must be a finite number >= 0".to_string());
-        }
         Ok(Drag {
-            strength: p.strength,
+            strength: non_negative_finite(spec, "strength", p.strength)?,
         })
     }
 }

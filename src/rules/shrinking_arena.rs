@@ -9,7 +9,7 @@
 
 use serde::Deserialize;
 
-use super::{params, Rule, RuleContext};
+use super::{non_negative_finite, params, positive_finite, Rule, RuleContext};
 use crate::scenario::RuleSpec;
 use crate::sim::SimState;
 
@@ -30,21 +30,9 @@ pub struct ShrinkingArena {
 impl ShrinkingArena {
     pub fn from_spec(spec: &RuleSpec) -> Result<Self, String> {
         let p: Params = params(spec)?;
-        if !(p.rate.is_finite() && p.rate >= 0.0) {
-            return Err(format!(
-                "Rule 'shrinking_arena': rate must be >= 0, got {}",
-                p.rate
-            ));
-        }
-        if !(p.min_radius.is_finite() && p.min_radius > 0.0) {
-            return Err(format!(
-                "Rule 'shrinking_arena': min_radius must be > 0, got {}",
-                p.min_radius
-            ));
-        }
         Ok(ShrinkingArena {
-            rate: p.rate,
-            min_radius: p.min_radius,
+            rate: non_negative_finite(spec, "rate", p.rate)?,
+            min_radius: positive_finite(spec, "min_radius", p.min_radius)?,
         })
     }
 }

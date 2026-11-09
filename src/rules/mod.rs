@@ -77,6 +77,38 @@ pub fn build_all(scenario: &Scenario) -> Result<Vec<Box<dyn Rule>>, String> {
     scenario.rules.iter().map(build).collect()
 }
 
+/// Checks a Rule or End Condition parameter is a finite number > 0.
+pub fn positive_finite(spec: &RuleSpec, name: &str, value: f64) -> Result<f64, String> {
+    check_param(spec, name, value, value > 0.0, " > 0")
+}
+
+/// Checks a Rule or End Condition parameter is a finite number >= 0.
+pub fn non_negative_finite(spec: &RuleSpec, name: &str, value: f64) -> Result<f64, String> {
+    check_param(spec, name, value, value >= 0.0, " >= 0")
+}
+
+/// Checks a Rule or End Condition parameter is a finite number.
+pub fn finite(spec: &RuleSpec, name: &str, value: f64) -> Result<f64, String> {
+    check_param(spec, name, value, true, "")
+}
+
+fn check_param(
+    spec: &RuleSpec,
+    name: &str,
+    value: f64,
+    in_range: bool,
+    bound: &str,
+) -> Result<f64, String> {
+    if value.is_finite() && in_range {
+        Ok(value)
+    } else {
+        Err(format!(
+            "'{}': {name} must be a finite number{bound}, got {value}",
+            spec.kind
+        ))
+    }
+}
+
 /// Deserializes a Rule's parameters (every key of its table except `kind`).
 pub fn params<T: DeserializeOwned>(spec: &RuleSpec) -> Result<T, String> {
     serde_path_to_error::deserialize(toml::Value::Table(spec.params.clone())).map_err(|e| {

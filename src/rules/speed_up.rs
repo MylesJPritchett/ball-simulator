@@ -3,7 +3,7 @@
 
 use serde::Deserialize;
 
-use super::{params, Rule, RuleContext};
+use super::{non_negative_finite, params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
 use crate::sim::{BoundaryHit, SimState};
 
@@ -21,11 +21,9 @@ struct Params {
 impl SpeedUp {
     pub fn from_spec(spec: &RuleSpec) -> Result<Self, String> {
         let p: Params = params(spec)?;
-        if !(p.percent.is_finite() && p.percent >= 0.0) {
-            return Err("Rule 'speed_up': percent must be a finite number >= 0".to_string());
-        }
+        let percent = non_negative_finite(spec, "percent", p.percent)?;
         Ok(SpeedUp {
-            factor: 1.0 + p.percent / 100.0,
+            factor: 1.0 + percent / 100.0,
         })
     }
 }

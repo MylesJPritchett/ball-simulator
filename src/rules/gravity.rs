@@ -2,7 +2,7 @@
 
 use serde::Deserialize;
 
-use super::{params, Rule, RuleContext};
+use super::{finite, params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
 use crate::sim::{SimState, Vec2};
 
@@ -20,11 +20,8 @@ struct Params {
 impl Gravity {
     pub fn from_spec(spec: &RuleSpec) -> Result<Self, String> {
         let p: Params = params(spec)?;
-        if !p.strength.is_finite() {
-            return Err("Rule 'gravity': strength must be a finite number".to_string());
-        }
         Ok(Gravity {
-            strength: p.strength,
+            strength: finite(spec, "strength", p.strength)?,
         })
     }
 }

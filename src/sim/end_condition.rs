@@ -74,13 +74,7 @@ fn min_radius(spec: &RuleSpec) -> Result<f64, String> {
         min_radius: f64,
     }
     let p: Params = crate::rules::params(spec)?;
-    if !(p.min_radius.is_finite() && p.min_radius > 0.0) {
-        return Err(format!(
-            "End Condition '{}': min_radius must be a finite number > 0",
-            spec.kind
-        ));
-    }
-    Ok(p.min_radius)
+    crate::rules::positive_finite(spec, "min_radius", p.min_radius)
 }
 
 /// The ball count has reached the Scenario's Population Cap (which the

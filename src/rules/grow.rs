@@ -8,7 +8,7 @@
 
 use serde::Deserialize;
 
-use super::{params, Rule, RuleContext};
+use super::{params, positive_finite, Rule, RuleContext};
 use crate::scenario::RuleSpec;
 use crate::sim::{BoundaryHit, SimState};
 
@@ -25,10 +25,9 @@ pub struct Grow {
 impl Grow {
     pub fn from_spec(spec: &RuleSpec) -> Result<Self, String> {
         let p: Params = params(spec)?;
-        if !(p.amount.is_finite() && p.amount > 0.0) {
-            return Err("Rule 'grow': amount must be a finite number > 0".into());
-        }
-        Ok(Grow { amount: p.amount })
+        Ok(Grow {
+            amount: positive_finite(spec, "amount", p.amount)?,
+        })
     }
 }
 

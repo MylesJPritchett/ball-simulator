@@ -12,10 +12,16 @@ fn at_rest() -> String {
 
 #[test]
 fn gravity_accelerates_a_ball_dropped_from_rest_downward_at_the_configured_rate() {
-    let toml = format!("{}\n[[rules]]\nkind = \"gravity\"\nstrength = 1000.0\n", at_rest());
+    let toml = format!(
+        "{}\n[[rules]]\nkind = \"gravity\"\nstrength = 1000.0\n",
+        at_rest()
+    );
     for seed in 0..5 {
         let record = run(&toml, seed);
-        let first = record.boundary_hits.first().expect("the ball falls onto the Boundary");
+        let first = record
+            .boundary_hits
+            .first()
+            .expect("the ball falls onto the Boundary");
 
         // Speed grows linearly with time under constant acceleration: v = g * t.
         let expected = 1000.0 * first.time();
@@ -25,7 +31,11 @@ fn gravity_accelerates_a_ball_dropped_from_rest_downward_at_the_configured_rate(
             first.speed
         );
         // y points down, so a falling ball lands on the lower half of the Boundary.
-        assert!(first.angle.sin() > 0.0, "seed {seed}: angle {}", first.angle);
+        assert!(
+            first.angle.sin() > 0.0,
+            "seed {seed}: angle {}",
+            first.angle
+        );
     }
 }
 
@@ -51,8 +61,10 @@ fn drag_reduces_speed_over_time_between_hits() {
 }
 
 fn speed_up(max_speed: f64) -> String {
-    MINIMAL.replace("speed = 900.0", &format!("speed = 900.0\nmax_speed = {max_speed:?}"))
-        + "\n[[rules]]\nkind = \"speed_up\"\npercent = 10.0\n"
+    MINIMAL.replace(
+        "speed = 900.0",
+        &format!("speed = 900.0\nmax_speed = {max_speed:?}"),
+    ) + "\n[[rules]]\nkind = \"speed_up\"\npercent = 10.0\n"
 }
 
 #[test]
@@ -86,7 +98,11 @@ fn gravity_cannot_push_a_ball_past_max_speed() {
         + "\n[[rules]]\nkind = \"gravity\"\nstrength = 5000.0\n";
     let record = run(&toml, 3);
 
-    assert!(record.stats.max_speed <= 1000.0 + 1e-9, "{}", record.stats.max_speed);
+    assert!(
+        record.stats.max_speed <= 1000.0 + 1e-9,
+        "{}",
+        record.stats.max_speed
+    );
 }
 
 #[test]

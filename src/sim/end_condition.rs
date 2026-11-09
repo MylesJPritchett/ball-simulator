@@ -24,12 +24,10 @@ pub trait EndCondition {
     fn is_met(&self, state: &SimState, substep: u64) -> bool;
 }
 
-/// Builds the Scenario's extra End Condition, if any. `time_cap` (or none)
-/// means the time cap alone ends the Video.
+/// Builds the Scenario's End Condition. `time_cap` builds nothing: the
+/// time cap built into the simulation alone ends the Video.
 pub fn build(scenario: &Scenario) -> Result<Option<Box<dyn EndCondition>>, String> {
-    let Some(spec) = &scenario.end_condition else {
-        return Ok(None);
-    };
+    let spec = &scenario.end_condition;
     match spec.kind.as_str() {
         TIME_CAP => Ok(None),
         POPULATION_CAP => {

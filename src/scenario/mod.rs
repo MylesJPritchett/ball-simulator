@@ -52,8 +52,8 @@ pub struct Scenario {
     pub arena: ArenaSpec,
     pub ball: BallSpec,
     pub rules: Vec<RuleSpec>,
-    /// Required in files, so always `Some` once parsed.
-    pub end_condition: Option<RuleSpec>,
+    /// The Scenario's End Condition (`kind = "time_cap"` for the cap alone).
+    pub end_condition: RuleSpec,
     /// Thresholds a Seed must meet to be rendered.
     pub quality_gate: QualityGateSpec,
     /// Pinned instrument / scale / pitch mode (`[sound]`).
@@ -215,7 +215,7 @@ impl Scenario {
             arena: file_data.arena,
             ball: file_data.ball,
             rules: file_data.rules,
-            end_condition: Some(end_condition),
+            end_condition,
             quality_gate: file_data.quality_gate,
             sound: file_data.sound,
             look: file_data.look,

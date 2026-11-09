@@ -27,8 +27,10 @@ kind = "play_note"
 [end_condition]
 kind = "population_cap"
 
+# Heat: overlaps glow hotter, reaching white-hot at the Population Cap.
 [look]
 counter = "ball_count"
+heat = true
 
 # Seeds outside these are rejected and replaced. Durations are Video length
 # in seconds (action plus the ~1.5 s ending hold).

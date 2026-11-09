@@ -8,6 +8,8 @@
 //! Rules must be deterministic: any randomness comes from `ctx.rng`, never from
 //! the clock, a thread RNG or hash-map iteration order.
 
+mod split;
+
 use serde::de::DeserializeOwned;
 
 use crate::scenario::{RuleSpec, Scenario};
@@ -48,9 +50,8 @@ pub trait Rule {
 
 /// Builds one Rule from its Scenario entry.
 pub fn build(spec: &RuleSpec) -> Result<Box<dyn Rule>, String> {
-    #[allow(clippy::match_single_binding)]
     match spec.kind.as_str() {
-        // "gravity" => Ok(Box::new(gravity::Gravity::from_spec(spec)?)),
+        "split" => Ok(Box::new(split::Split::from_spec(spec)?)),
         other => Err(format!("unknown Rule '{other}'")),
     }
 }

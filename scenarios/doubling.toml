@@ -1,0 +1,24 @@
+# Every bounce it doubles: each Boundary Hit splits a ball in two, fanned
+# around its bounce, until the Population Cap is reached.
+
+name = "Doubling"
+hook_title = "Every bounce it doubles"
+time_cap = 60.0
+population_cap = 2000
+
+[arena]
+radius = 460.0
+
+[ball]
+radius = 16.0
+speed = 250.0
+
+# A narrow fan keeps the children's chords long; wider fans reach the cap
+# much sooner (spread 20 -> ~16 s, spread 12 -> ~20-33 s at this speed).
+[[rules]]
+kind = "split"
+into = 2
+spread = 12.0
+
+[end_condition]
+kind = "population_cap"

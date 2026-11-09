@@ -39,9 +39,10 @@ pub fn generate(scenario: &Scenario, seed: u64, out_root: &Path) -> Result<PathB
 
     // Headless run first: audio (and later the Quality Gate) use the record.
     let record = sim::run(scenario, seed);
-    // Frame k shows the state after k * SUBSTEPS_PER_FRAME substeps.
-    let frames = record.end.substep.div_ceil(SUBSTEPS_PER_FRAME);
-    let duration = frames as f64 / FPS as f64;
+    // The Video runs through the ending's hold, not just to the End Condition.
+    let ending = record.ending;
+    let frames = ending.frames();
+    let duration = ending.duration();
 
     let wav = dir.join("audio.wav");
     let samples = audio::synthesize(&record, duration);
@@ -52,8 +53,12 @@ pub fn generate(scenario: &Scenario, seed: u64, out_root: &Path) -> Result<PathB
     let mut encoder = VideoEncoder::start(&mp4, &wav, layout::WIDTH, layout::HEIGHT, FPS)?;
     let mut sim = Simulation::new(scenario, seed);
     let mut renderer = Renderer::new(scenario.arena.radius);
-    for _ in 0..frames {
-        encoder.write_frame(renderer.draw(sim.world()))?;
+    // Frame k shows the state after k * SUBSTEPS_PER_FRAME substeps; once the
+    // run has ended `step_frame` does nothing, so the action freezes and the
+    // flash plays over the frozen frame.
+    for frame in 0..frames {
+        renderer.draw(sim.world());
+        encoder.write_frame(renderer.flash(ending.flash_at(frame * SUBSTEPS_PER_FRAME)))?;
         sim.step_frame();
     }
     encoder.finish()?;

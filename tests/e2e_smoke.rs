@@ -68,7 +68,8 @@ speed = 3000.0
     assert_eq!(probe(&video, "stream=r_frame_rate", "v:0"), "60/1");
     assert_eq!(probe(&video, "stream=codec_type", "a:0"), "audio");
     let duration: f64 = probe(&video, "format=duration", "v:0").parse().unwrap();
-    assert!((duration - 1.0).abs() < 0.1, "duration {duration}");
+    // 1 s of action, then the ending's ~1.5 s freeze + flash + hold.
+    assert!((duration - 2.5).abs() < 0.1, "duration {duration}");
 
     let meta: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(video_dir.join("meta.json")).unwrap())

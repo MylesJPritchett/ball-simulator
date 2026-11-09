@@ -2,7 +2,9 @@
 
 use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+use serde::Serialize;
+
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize)]
 pub struct Vec2 {
     pub x: f64,
     pub y: f64,
@@ -29,6 +31,12 @@ impl Vec2 {
 
     pub fn angle(self) -> f64 {
         self.y.atan2(self.x)
+    }
+
+    /// This vector rotated by `angle` radians.
+    pub fn rotated(self, angle: f64) -> Self {
+        let (s, c) = angle.sin_cos();
+        Vec2::new(self.x * c - self.y * s, self.x * s + self.y * c)
     }
 }
 
@@ -71,7 +79,7 @@ pub struct Arena {
     pub radius: f64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Ball {
     /// Stable identifier, unique within a simulation run.
     pub id: u32,

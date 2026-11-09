@@ -32,6 +32,8 @@ pub struct Scenario {
     pub hook_title: String,
     /// Hard time cap in seconds; always an End Condition.
     pub time_cap: f64,
+    /// Maximum ball count; the simulation never exceeds it.
+    pub population_cap: usize,
     pub arena: ArenaSpec,
     pub ball: BallSpec,
     pub rules: Vec<RuleSpec>,
@@ -67,6 +69,8 @@ struct ScenarioFile {
     name: String,
     hook_title: Option<String>,
     time_cap: f64,
+    #[serde(default = "default_population_cap")]
+    population_cap: usize,
     arena: ArenaSpec,
     ball: BallSpec,
     #[serde(default)]
@@ -85,6 +89,7 @@ impl Scenario {
             hook_title: file.hook_title.unwrap_or_else(|| file.name.clone()),
             name: file.name,
             time_cap: file.time_cap,
+            population_cap: file.population_cap,
             arena: file.arena,
             ball: file.ball,
             rules: file.rules,
@@ -117,6 +122,9 @@ impl Scenario {
         if !is_positive(self.time_cap) {
             return Err(self.invalid("time_cap must be greater than 0"));
         }
+        if self.population_cap == 0 {
+            return Err(self.invalid("population_cap must be at least 1"));
+        }
         if !is_positive(self.arena.radius) {
             return Err(self.invalid("arena.radius must be greater than 0"));
         }
@@ -130,6 +138,13 @@ impl Scenario {
         crate::sim::end_condition::build(self).map_err(|m| self.invalid(m))?;
         Ok(())
     }
+}
+
+/// Default Population Cap when a Scenario does not set one.
+pub const DEFAULT_POPULATION_CAP: usize = 2000;
+
+fn default_population_cap() -> usize {
+    DEFAULT_POPULATION_CAP
 }
 
 /// True for finite-or-infinite values above zero; false for zero, negatives and NaN.

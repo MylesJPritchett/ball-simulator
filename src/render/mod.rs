@@ -5,7 +5,7 @@
 
 pub mod layout;
 
-use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
+use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Rect, Stroke, Transform};
 
 use crate::sim::World;
 
@@ -13,6 +13,9 @@ const BACKGROUND: [u8; 3] = [12, 12, 18];
 const BOUNDARY: [u8; 3] = [230, 230, 240];
 const BALL: [u8; 3] = [255, 120, 90];
 const BOUNDARY_WIDTH: f32 = 6.0;
+/// Ending flash colour and its opacity at full strength.
+const FLASH: [u8; 3] = [255, 255, 255];
+const FLASH_MAX_ALPHA: f32 = 0.75;
 
 fn rgb([r, g, b]: [u8; 3]) -> Color {
     Color::from_rgba8(r, g, b, 255)
@@ -78,6 +81,22 @@ impl Renderer {
             }
         }
 
+        self.pixmap.data()
+    }
+
+    /// Washes the frame last drawn with the ending's flash (`strength` 0..=1,
+    /// from [`crate::sim::Ending::flash_at`]) and returns it as RGBA bytes.
+    pub fn flash(&mut self, strength: f32) -> &[u8] {
+        let alpha = (strength.clamp(0.0, 1.0) * FLASH_MAX_ALPHA * 255.0).round() as u8;
+        if alpha > 0 {
+            let [r, g, b] = FLASH;
+            let mut paint = Paint::default();
+            paint.set_color(Color::from_rgba8(r, g, b, alpha));
+            let full = Rect::from_xywh(0.0, 0.0, layout::WIDTH as f32, layout::HEIGHT as f32)
+                .expect("non-zero frame size");
+            self.pixmap
+                .fill_rect(full, &paint, Transform::identity(), None);
+        }
         self.pixmap.data()
     }
 }

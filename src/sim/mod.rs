@@ -6,10 +6,12 @@
 //! always agree.
 
 pub mod end_condition;
+pub mod ending;
 pub mod record;
 pub mod rng;
 mod world;
 
+pub use ending::Ending;
 pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
 pub use world::{Arena, Ball, Vec2, World};
 
@@ -45,6 +47,7 @@ pub struct Simulation {
     rng: Rng,
     substep: u64,
     time_cap_substeps: u64,
+    population_cap: usize,
     boundary_hits: Vec<BoundaryHit>,
     ball_count: Vec<BallCountSample>,
     stats: SimStats,
@@ -88,6 +91,7 @@ impl Simulation {
             rng,
             substep: 0,
             time_cap_substeps: (scenario.time_cap * SUBSTEP_HZ as f64).round() as u64,
+            population_cap: scenario.population_cap,
             boundary_hits: Vec::new(),
             ball_count,
             stats: SimStats::default(),
@@ -159,6 +163,10 @@ impl Simulation {
         for (index, hit) in hits {
             for rule in &mut self.rules {
                 rule.on_boundary_hit(&mut self.world, index, &hit, &mut ctx);
+                // Population Cap: drop balls a Rule just added beyond the cap. The
+                // count was within the cap before this hit, so only new balls go
+                // and pending hit indices stay valid.
+                self.world.balls.truncate(self.population_cap);
             }
             self.boundary_hits.push(hit);
         }
@@ -209,8 +217,10 @@ impl Simulation {
             final_state_hash: hash_world(&self.world, self.substep),
             boundary_hits: self.boundary_hits,
             ball_count: self.ball_count,
+            ending: Ending::new(end.substep),
             end,
             stats: self.stats,
+            final_balls: self.world.balls,
         }
     }
 }

@@ -4,10 +4,11 @@
 //! Adding an End Condition: implement [`EndCondition`] (in this file or a
 //! sibling module) and add a match arm in [`build`].
 
-use crate::scenario::Scenario;
+use crate::scenario::{RuleSpec, Scenario};
 use crate::sim::World;
 
 pub const TIME_CAP: &str = "time_cap";
+pub const POPULATION_CAP: &str = "population_cap";
 
 pub trait EndCondition {
     /// Id written to `SimRecord::end.condition`.
@@ -25,6 +26,38 @@ pub fn build(scenario: &Scenario) -> Result<Option<Box<dyn EndCondition>>, Strin
     };
     match spec.kind.as_str() {
         TIME_CAP => Ok(None),
+        POPULATION_CAP => {
+            no_params(spec)?;
+            Ok(Some(Box::new(PopulationCap {
+                cap: scenario.population_cap,
+            })))
+        }
         other => Err(format!("unknown End Condition '{other}'")),
+    }
+}
+
+fn no_params(spec: &RuleSpec) -> Result<(), String> {
+    match spec.params.keys().next() {
+        Some(key) => Err(format!(
+            "End Condition '{}' has no parameter '{key}'",
+            spec.kind
+        )),
+        None => Ok(()),
+    }
+}
+
+/// The ball count has reached the Scenario's Population Cap (which the
+/// simulation never lets it exceed).
+struct PopulationCap {
+    cap: usize,
+}
+
+impl EndCondition for PopulationCap {
+    fn id(&self) -> &'static str {
+        POPULATION_CAP
+    }
+
+    fn is_met(&self, world: &World, _substep: u64) -> bool {
+        world.balls.len() >= self.cap
     }
 }

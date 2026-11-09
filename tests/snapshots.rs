@@ -36,3 +36,14 @@ fn minimal_seed_1() {
     assert_eq!(record.end.substep, 4800);
     assert_eq!(record.final_state_hash, 12091774788095173436);
 }
+
+#[test]
+fn doubling_seed_1() {
+    let record = sim::run(&shipped("doubling"), 1);
+
+    assert_eq!(record.boundary_hits.len(), 2015);
+    assert_eq!(record.ball_count.last().unwrap().count, 2000);
+    assert_eq!(record.end.condition, "population_cap");
+    assert_eq!(record.end.substep, 12282);
+    assert_eq!(record.final_state_hash, 2820098640751858260);
+}

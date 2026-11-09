@@ -23,3 +23,10 @@ kind = "change_colour"
 
 [end_condition]
 kind = "arena_filled"
+
+# Seeds outside these are rejected and replaced. Durations are Video length
+# in seconds (action plus the ~1.5 s ending hold).
+[quality_gate]
+min_duration = 15.0
+max_duration = 60.0
+min_boundary_hits = 40

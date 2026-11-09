@@ -1,0 +1,25 @@
+# It grows every bounce: one ball gets bigger on each Boundary Hit (and
+# changes colour) until it fills the Arena.
+
+name = "Growing"
+hook_title = "It grows every bounce"
+time_cap = 60.0
+
+[arena]
+radius = 460.0
+
+[ball]
+radius = 14.0
+speed = 900.0
+
+# Bounces come faster as the ball grows (shorter chords), so the ending
+# accelerates on its own.
+[[rules]]
+kind = "grow"
+amount = { min = 5.0, max = 7.0 }
+
+[[rules]]
+kind = "change_colour"
+
+[end_condition]
+kind = "arena_filled"

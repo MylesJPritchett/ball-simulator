@@ -9,6 +9,7 @@ use crate::sim::World;
 
 pub const TIME_CAP: &str = "time_cap";
 pub const POPULATION_CAP: &str = "population_cap";
+pub const ARENA_FILLED: &str = "arena_filled";
 
 pub trait EndCondition {
     /// Id written to `SimRecord::end.condition`.
@@ -31,6 +32,10 @@ pub fn build(scenario: &Scenario) -> Result<Option<Box<dyn EndCondition>>, Strin
             Ok(Some(Box::new(PopulationCap {
                 cap: scenario.population_cap,
             })))
+        }
+        ARENA_FILLED => {
+            no_params(spec)?;
+            Ok(Some(Box::new(ArenaFilled)))
         }
         other => Err(format!("unknown End Condition '{other}'")),
     }
@@ -59,5 +64,22 @@ impl EndCondition for PopulationCap {
 
     fn is_met(&self, world: &World, _substep: u64) -> bool {
         world.balls.len() >= self.cap
+    }
+}
+
+/// A ball has grown to fill the Arena. The simulation never lets a ball be
+/// larger than the Arena, so "filled" means its radius has reached the Arena's.
+struct ArenaFilled;
+
+impl EndCondition for ArenaFilled {
+    fn id(&self) -> &'static str {
+        ARENA_FILLED
+    }
+
+    fn is_met(&self, world: &World, _substep: u64) -> bool {
+        world
+            .balls
+            .iter()
+            .any(|ball| ball.radius >= world.arena.radius)
     }
 }

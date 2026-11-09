@@ -1,0 +1,28 @@
+# The smallest possible Scenario: one ball bouncing in a circular Arena,
+# a note on every Boundary Hit, ending at the time cap.
+
+name = "Minimal"
+hook_title = "One ball, one bounce at a time"
+time_cap = 10.0
+
+[arena]
+radius = 460.0
+
+[ball]
+radius = 30.0
+speed = 900.0
+
+[end_condition]
+kind = "time_cap"
+
+# Seeds outside these are rejected and replaced. Durations are Video length
+# in seconds (action plus the ~1.5 s ending hold).
+[quality_gate]
+min_duration = 10.0
+max_duration = 12.0
+min_boundary_hits = 8
+
+[meta]
+title = "{hook_title}"
+description = "One ball, a circle, and a note on every bounce: {boundary_hits} of them."
+hashtags = ["bounce", "relaxing"]

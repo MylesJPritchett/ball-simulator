@@ -1,0 +1,45 @@
+# It grows every bounce: one ball gets bigger on each Boundary Hit (and
+# changes colour) until it fills the Arena.
+
+name = "Growing"
+hook_title = "It grows every bounce"
+time_cap = 60.0
+
+[arena]
+radius = 460.0
+
+[ball]
+radius = 14.0
+speed = { min = 850.0, max = 950.0 }
+
+# Bounces come faster as the ball grows (shorter chords), so the ending
+# accelerates on its own.
+[[rules]]
+kind = "grow"
+amount = { min = 5.0, max = 7.0 }
+
+[[rules]]
+kind = "change_colour"
+
+# Every Boundary Hit plays a note.
+[[rules]]
+kind = "play_note"
+
+[end_condition]
+kind = "arena_filled"
+
+# The note drops as the ball grows.
+[sound]
+pitch_mode = "ball_size"
+
+# Seeds outside these are rejected and replaced. Durations are Video length
+# in seconds (action plus the ~1.5 s ending hold).
+[quality_gate]
+min_duration = 25.0
+max_duration = 55.0
+min_boundary_hits = 40
+
+[meta]
+title = "It grows {rules[0].amount} units every bounce - can it fill the Arena?"
+description = "One ball grows on every Boundary Hit until it fills the Arena: {boundary_hits} bounces in {duration} seconds."
+hashtags = ["growing", "fill"]

@@ -22,6 +22,11 @@
             ffmpeg
           ];
           RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
+          # The preview window (minifb, X11 backend) dlopens these at runtime.
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (with pkgs; [
+            libX11
+            libXcursor
+          ]);
         };
       });
 }

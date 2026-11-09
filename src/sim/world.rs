@@ -86,6 +86,8 @@ pub struct Ball {
     pub pos: Vec2,
     pub vel: Vec2,
     pub radius: f64,
+    /// Index into the Video's palette (render wraps it to the palette length).
+    pub colour: u32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -104,6 +106,16 @@ impl World {
         }
     }
 
+    /// Scales down any ball moving faster than `max_speed`, keeping its direction.
+    pub fn limit_speed(&mut self, max_speed: f64) {
+        for ball in &mut self.balls {
+            let speed = ball.vel.length();
+            if speed > max_speed {
+                ball.vel = ball.vel * (max_speed / speed);
+            }
+        }
+    }
+
     /// Adds a ball with a fresh id and returns its index in `balls`.
     pub fn spawn(&mut self, pos: Vec2, vel: Vec2, radius: f64) -> usize {
         let id = self.next_ball_id;
@@ -113,6 +125,7 @@ impl World {
             pos,
             vel,
             radius,
+            colour: 0,
         });
         self.balls.len() - 1
     }

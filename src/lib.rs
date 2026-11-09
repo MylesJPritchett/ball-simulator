@@ -9,6 +9,7 @@ pub mod audio;
 pub mod encode;
 pub mod meta;
 pub mod pipeline;
+pub mod preview;
 pub mod render;
 pub mod rules;
 pub mod scenario;

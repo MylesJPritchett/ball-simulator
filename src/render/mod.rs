@@ -11,7 +11,16 @@ use crate::sim::World;
 
 const BACKGROUND: [u8; 3] = [12, 12, 18];
 const BOUNDARY: [u8; 3] = [230, 230, 240];
-const BALL: [u8; 3] = [255, 120, 90];
+/// Ball colours, indexed by `Ball::colour` (wrapping). A simple default until
+/// each Video gets its own palette.
+const DEFAULT_PALETTE: [[u8; 3]; 6] = [
+    [255, 120, 90],
+    [255, 200, 80],
+    [120, 220, 130],
+    [90, 190, 255],
+    [170, 130, 255],
+    [255, 120, 200],
+];
 const BOUNDARY_WIDTH: f32 = 6.0;
 /// Ending flash colour and its opacity at full strength.
 const FLASH: [u8; 3] = [255, 255, 255];
@@ -66,8 +75,9 @@ impl Renderer {
                 .stroke_path(&circle, &paint, &stroke, Transform::identity(), None);
         }
 
-        paint.set_color(rgb(BALL));
         for ball in &world.balls {
+            let colour = DEFAULT_PALETTE[ball.colour as usize % DEFAULT_PALETTE.len()];
+            paint.set_color(rgb(colour));
             let x = cx + ball.pos.x as f32 * self.scale;
             let y = cy + ball.pos.y as f32 * self.scale;
             if let Some(circle) = PathBuilder::from_circle(x, y, ball.radius as f32 * self.scale) {

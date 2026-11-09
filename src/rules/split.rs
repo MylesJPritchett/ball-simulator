@@ -9,7 +9,7 @@
 //! ```
 //!
 //! The ball itself takes the first direction of the fan; the rest are new
-//! balls with the same position, speed and radius. The Population Cap is
+//! balls with the same position, speed, radius and colour. The Population Cap is
 //! enforced by the simulation, not here.
 
 use serde::Deserialize;
@@ -60,7 +60,8 @@ impl Rule for Split {
         let offset = |i: u32| -self.spread / 2.0 + step * i as f64;
         world.balls[ball].vel = parent.vel.rotated(offset(0));
         for i in 1..self.into {
-            world.spawn(parent.pos, parent.vel.rotated(offset(i)), parent.radius);
+            let child = world.spawn(parent.pos, parent.vel.rotated(offset(i)), parent.radius);
+            world.balls[child].colour = parent.colour;
         }
     }
 }

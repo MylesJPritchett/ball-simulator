@@ -54,6 +54,21 @@ fn split_into_three_fans_symmetrically_about_the_reflected_velocity() {
     }
 }
 
+#[test]
+fn split_children_keep_the_parents_colour() {
+    let first_hit = run(MINIMAL, SEED).boundary_hits[0].substep;
+    let stop = first_hit as f64 / SUBSTEP_HZ as f64;
+    // change_colour runs first, so the parent is on colour 1 when it splits.
+    let toml = format!(
+        "{}\n[[rules]]\nkind = \"change_colour\"\n[[rules]]\nkind = \"split\"\ninto = 3\nspread = 40.0\n",
+        with_time_cap(MINIMAL, stop)
+    );
+    let record = run(&toml, SEED);
+
+    let colours: Vec<u32> = record.final_balls.iter().map(|b| b.colour).collect();
+    assert_eq!(colours, [1, 1, 1]);
+}
+
 /// A Scenario with a Population Cap (a top-level key, so `.replace()`).
 fn with_cap(toml: &str, cap: usize) -> String {
     toml.replace(

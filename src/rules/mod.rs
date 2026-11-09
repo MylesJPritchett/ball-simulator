@@ -8,6 +8,11 @@
 //! Rules must be deterministic: any randomness comes from `ctx.rng`, never from
 //! the clock, a thread RNG or hash-map iteration order.
 
+mod change_colour;
+mod drag;
+mod gravity;
+mod shrinking_arena;
+mod speed_up;
 mod split;
 
 use serde::de::DeserializeOwned;
@@ -51,6 +56,11 @@ pub trait Rule {
 /// Builds one Rule from its Scenario entry.
 pub fn build(spec: &RuleSpec) -> Result<Box<dyn Rule>, String> {
     match spec.kind.as_str() {
+        "gravity" => Ok(Box::new(gravity::Gravity::from_spec(spec)?)),
+        "drag" => Ok(Box::new(drag::Drag::from_spec(spec)?)),
+        "speed_up" => Ok(Box::new(speed_up::SpeedUp::from_spec(spec)?)),
+        "change_colour" => Ok(Box::new(change_colour::ChangeColour::from_spec(spec)?)),
+        "shrinking_arena" => Ok(Box::new(shrinking_arena::ShrinkingArena::from_spec(spec)?)),
         "split" => Ok(Box::new(split::Split::from_spec(spec)?)),
         other => Err(format!("unknown Rule '{other}'")),
     }

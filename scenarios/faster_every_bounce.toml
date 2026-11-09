@@ -1,0 +1,24 @@
+# One ball that gets faster and changes colour on every Boundary Hit,
+# up to the max speed.
+
+name = "Faster every bounce"
+hook_title = "It gets faster every bounce"
+time_cap = 20.0
+
+[arena]
+radius = 460.0
+
+[ball]
+radius = 30.0
+speed = 900.0
+max_speed = 4000.0
+
+[[rules]]
+kind = "speed_up"
+percent = 8.0
+
+[[rules]]
+kind = "change_colour"
+
+[end_condition]
+kind = "time_cap"

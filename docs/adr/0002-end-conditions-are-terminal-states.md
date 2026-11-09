@@ -10,4 +10,4 @@ Videos that stopped at a hidden threshold (a time cap, a ball count, a max speed
 ## Consequences
 
 - The Meltdown ("until it breaks") is staged, not real. Because rendering is offline and deterministic (ADR 0001), the simulation struggling never shows in the Video. So the Meltdown fires deterministically at the Scenario's Population Cap, and its Play-out fakes the breakdown (stutter, glitch, audio crackle, hard cut) with no flash or final chord.
-- `arena_covered` is a threshold underneath (a fixed ~98% coverage). It counts as terminal only because at that level the Arena visibly reads as full, so Scenarios cannot set the fraction.
+- `arena_covered` is a threshold underneath (a fixed ~98% coverage). It counts as terminal only because at that level the Arena visibly reads as full, so Scenarios cannot set the fraction. Coverage is measured inside a fixed rim margin (2% of the Arena radius, about the Boundary stroke's width): bouncing balls cover the rim only at the instant they touch the Boundary, so no swarm ever fills it, yet the thin gap there does not stop the Arena reading as full.

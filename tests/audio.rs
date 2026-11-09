@@ -190,16 +190,16 @@ fn instrument_and_scale_vary_by_seed() {
 
 #[test]
 fn pinned_instrument_scale_and_pitch_mode_are_respected() {
-    let toml = with_sound("instrument = \"marimba\"\nscale = \"lydian\"\npitch_mode = \"angle\"");
-    for seed in 0..10 {
-        let record = run(&toml, seed);
-        assert_eq!(record.sound.instrument.name(), "marimba");
-        assert_eq!(record.sound.scale.name(), "lydian");
-        assert_eq!(record.sound.pitch_mode.name(), "angle");
-    }
-    for seed in 0..10 {
-        let record = run(&with_sound("scale = \"hirajoshi\""), seed);
-        assert_eq!(record.sound.scale.name(), "hirajoshi");
+    for scale in ["lydian", "hirajoshi"] {
+        let toml = with_sound(&format!(
+            "instrument = \"marimba\"\nscale = \"{scale}\"\npitch_mode = \"angle\""
+        ));
+        for seed in 0..10 {
+            let record = run(&toml, seed);
+            assert_eq!(record.sound.instrument.name(), "marimba");
+            assert_eq!(record.sound.scale.name(), scale);
+            assert_eq!(record.sound.pitch_mode.name(), "angle");
+        }
     }
 }
 

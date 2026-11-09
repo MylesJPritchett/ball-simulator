@@ -110,7 +110,8 @@ impl Scale {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PitchMode {
-    /// A global step counter: each Boundary Hit is the next degree up, wrapping.
+    /// A global step counter: each Boundary Hit is the next degree up, turning
+    /// around at the top and bottom of the range.
     #[default]
     Step,
     /// Bigger balls play lower notes.

@@ -1,0 +1,16 @@
+# The smallest possible Scenario: one ball bouncing in a circular Arena,
+# a note on every Boundary Hit, ending at the time cap.
+
+name = "Minimal"
+hook_title = "One ball, one bounce at a time"
+time_cap = 10.0
+
+[arena]
+radius = 460.0
+
+[ball]
+radius = 30.0
+speed = 900.0
+
+[end_condition]
+kind = "time_cap"

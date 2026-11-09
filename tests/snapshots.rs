@@ -105,11 +105,11 @@ fn closing_in_seed_1() {
     assert_seed_1(
         "closing_in",
         Snapshot {
-            boundary_hits: 84,
+            boundary_hits: 94,
             final_ball_count: 1,
             end_condition: "arena_filled",
-            end_substep: 16016,
-            final_state_hash: 14414972202662410175,
+            end_substep: 13851,
+            final_state_hash: 5573714443546182967,
         },
     );
 }
@@ -147,11 +147,11 @@ fn gravity_split_seed_1() {
     assert_seed_1(
         "gravity_split",
         Snapshot {
-            boundary_hits: 1501,
+            boundary_hits: 1499,
             final_ball_count: 1500,
             end_condition: "population_cap",
-            end_substep: 16526,
-            final_state_hash: 17657103179337597194,
+            end_substep: 18384,
+            final_state_hash: 8991188671581940454,
         },
     );
 }
@@ -189,11 +189,11 @@ fn shrinking_arena_seed_1() {
     assert_seed_1(
         "shrinking_arena",
         Snapshot {
-            boundary_hits: 90,
+            boundary_hits: 116,
             final_ball_count: 1,
             end_condition: "time_cap",
             end_substep: 18933,
-            final_state_hash: 7422997877164674145,
+            final_state_hash: 13579583287980973858,
         },
     );
 }

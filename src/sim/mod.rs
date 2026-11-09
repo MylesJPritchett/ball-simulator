@@ -173,17 +173,20 @@ impl Simulation {
             substep: self.substep,
             dt,
         };
+        let radius_before = self.world.arena.radius;
         for rule in &mut self.rules {
             rule.on_substep(&mut self.world, &mut ctx);
         }
         self.world.limit_speed(self.max_speed);
+        // How fast the Boundary moved inward this substep (0 for a fixed Arena).
+        let closing_speed = (radius_before - self.world.arena.radius) / dt;
 
         let completed = self.substep + 1;
         let mut hits = Vec::new();
         let arena_radius = self.world.arena.radius;
         for (index, ball) in self.world.balls.iter_mut().enumerate() {
             ball.pos += ball.vel * dt;
-            if let Some(angle) = resolve_boundary(ball, &self.world.arena) {
+            if let Some(angle) = resolve_boundary(ball, &self.world.arena, closing_speed) {
                 let hit_index = self.boundary_hits.len() + hits.len();
                 let pitch = self
                     .sound
@@ -279,22 +282,39 @@ impl Simulation {
     }
 }
 
-/// Exact circle Boundary resolution: if the ball is touching or past the
-/// Boundary, reflect its velocity about the Boundary normal (if moving outward)
-/// and push it back to exactly touch the Boundary from inside. Returns the hit
-/// angle on the Boundary if it hit.
-fn resolve_boundary(ball: &mut Ball, arena: &Arena) -> Option<f64> {
+/// Outward speed (relative to the Boundary, units/s) below which a ball
+/// touching the Boundary is resting on it rather than hitting it. Gravity
+/// pushes a settled ball outward by `strength / SUBSTEP_HZ` every substep
+/// (about 2 units/s for the strongest shipped gravity); a bounce this slow
+/// would rise less than a unit, so nothing visible or audible is lost.
+const RESTING_SPEED: f64 = 30.0;
+
+/// Exact circle Boundary resolution. A ball touching or past the Boundary is
+/// put back to exactly touch it from inside. It is a Boundary Hit only if the
+/// ball is moving outward relative to the Boundary, which moves inward at
+/// `closing_speed` while the Arena shrinks: then its velocity is reflected
+/// about the Boundary normal in the Boundary's frame. A ball resting on
+/// (outward slower than [`RESTING_SPEED`]) or already leaving the Boundary is
+/// not hitting it. Returns the hit angle on the Boundary if it hit.
+fn resolve_boundary(ball: &mut Ball, arena: &Arena, closing_speed: f64) -> Option<f64> {
     let limit = arena.radius - ball.radius;
     let dist = ball.pos.length();
     if dist < limit || dist == 0.0 {
         return None;
     }
     let normal = ball.pos * (1.0 / dist);
-    let outward = ball.vel.dot(normal);
-    if outward > 0.0 {
-        ball.vel -= normal * (2.0 * outward);
-    }
     ball.pos = normal * limit;
+    let outward = ball.vel.dot(normal) + closing_speed;
+    if outward <= 0.0 {
+        return None;
+    }
+    if outward < RESTING_SPEED {
+        // Resting contact: the ball moves with the Boundary instead of
+        // bouncing off it by an invisible amount every substep.
+        ball.vel -= normal * outward;
+        return None;
+    }
+    ball.vel -= normal * (2.0 * outward);
     Some(normal.angle())
 }
 

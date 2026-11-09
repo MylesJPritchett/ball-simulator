@@ -28,6 +28,31 @@ fn ball_never_ends_a_substep_outside_the_arena() {
 }
 
 #[test]
+fn ball_resting_on_the_boundary_stops_registering_boundary_hits() {
+    // Gravity pulls the ball down and drag bleeds off its bounce until it
+    // settles at the bottom of the Arena. A settled ball is touching the
+    // Boundary but not hitting it: no burst of a note per substep.
+    let toml = MINIMAL.replace("time_cap = 5.0", "time_cap = 30.0")
+        + "\n[[rules]]\nkind = \"gravity\"\nstrength = 800.0\n\
+           \n[[rules]]\nkind = \"drag\"\nstrength = 1.0\n";
+    for seed in 0..5 {
+        let record = run(&toml, seed);
+        let last_5_s = record.end.substep - 5 * 480;
+        let late_hits = record
+            .boundary_hits
+            .iter()
+            .filter(|h| h.substep > last_5_s)
+            .count();
+        assert!(late_hits <= 5, "seed {seed}: {late_hits} hits in the last 5 s");
+        assert!(
+            record.stats.max_boundary_overshoot <= 1e-9,
+            "seed {seed}: overshoot {}",
+            record.stats.max_boundary_overshoot
+        );
+    }
+}
+
+#[test]
 fn ball_bouncing_in_the_arena_produces_regular_boundary_hits() {
     // Speed 900 across an effective diameter of 2 * (460 - 30) = 860 means
     // roughly one Boundary Hit per second in the worst case (through the centre);

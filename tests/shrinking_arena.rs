@@ -2,7 +2,10 @@
 
 mod support;
 
+use std::path::Path;
+
 use ball_simulator::scenario::Scenario;
+use ball_simulator::sim::{self, SUBSTEP_HZ};
 use support::{run, MINIMAL};
 
 fn shrinking(rate: f64, min_radius: f64, time_cap: f64) -> String {
@@ -133,5 +136,59 @@ fn closing_boundary_knocks_the_ball_away_instead_of_dragging_it() {
                 pair[1].substep
             );
         }
+    }
+}
+
+fn shipped() -> Scenario {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("scenarios/shrinking_arena.toml");
+    Scenario::from_file(&path).expect("shipped Scenario should be valid")
+}
+
+#[test]
+fn shipped_scenario_ends_with_the_boundary_squeezing_the_ball() {
+    let scenario = shipped();
+    for seed in 1..=10 {
+        let record = sim::run(&scenario, seed);
+        assert_eq!(record.end.condition, "arena_filled", "seed {seed}");
+        let ball = &record.final_balls[0];
+        assert!(
+            record.final_arena_radius - ball.radius < 1.0,
+            "seed {seed}: Arena radius {} around a ball of radius {}",
+            record.final_arena_radius,
+            ball.radius
+        );
+    }
+}
+
+#[test]
+fn shipped_scenario_never_bursts_into_skimming_the_boundary() {
+    // A ball skimming round the Boundary hits it every few substeps: hundreds
+    // of notes a second, for as long as it skims. Bouncing across the Arena,
+    // hits only pile up like that in the last half second, when the Boundary
+    // is a few units from the ball and the squeeze itself is the climax.
+    let scenario = shipped();
+    let half_second = SUBSTEP_HZ / 2;
+    for seed in 1..=10 {
+        let record = sim::run(&scenario, seed);
+        let squeeze = record.end.substep - half_second;
+        let hits: Vec<u64> = record
+            .boundary_hits
+            .iter()
+            .map(|h| h.substep)
+            .filter(|&s| s < squeeze)
+            .collect();
+        let busiest = (0..hits.len())
+            .map(|i| {
+                hits[i..]
+                    .iter()
+                    .take_while(|&&s| s < hits[i] + half_second)
+                    .count()
+            })
+            .max()
+            .unwrap_or(0);
+        assert!(
+            busiest <= 40,
+            "seed {seed}: {busiest} Boundary Hits in half a second before the squeeze"
+        );
     }
 }

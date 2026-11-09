@@ -1,11 +1,11 @@
 # "The Arena is shrinking": the Boundary closes in on one ball, so Boundary
-# Hits (and notes) come faster and faster until it bottoms out.
+# Hits (and notes) come faster and faster until it squeezes the ball.
 #
-# Boundary Hits are radial, so the ball's angular momentum about the centre
-# is conserved: its path never comes closer to the centre than where it
-# started. The ball starts within half of (arena.radius - ball.radius) of the
-# centre, so min_radius > 230 + ball.radius / 2 keeps it from ending up
-# skimming round the Boundary hundreds of times a second.
+# Without gravity, Boundary Hits are radial, so the ball's angular momentum
+# about the centre is conserved: its path never comes closer to the centre
+# than where it started, and a small Arena leaves it skimming round the
+# Boundary hundreds of times a second. Gravity pulls it across the Arena
+# instead, so the Boundary can close in all the way.
 
 name = "The Arena is shrinking"
 hook_title = "The Arena is shrinking"
@@ -16,12 +16,20 @@ radius = 460.0
 
 [ball]
 radius = 60.0
-speed = { min = 1000.0, max = 1200.0 }
+speed = { min = 800.0, max = 950.0 }
+# Bouncing off the closing Boundary speeds the ball up a little every hit;
+# unchecked it reaches thousands of units a second and the last seconds of
+# the squeeze turn into a buzz of hits.
+max_speed = 1000.0
+
+[[rules]]
+kind = "gravity"
+strength = { min = 300.0, max = 600.0 }
 
 [[rules]]
 kind = "shrinking_arena"
-rate = { min = 4.5, max = 5.5 }   # Arena radius lost per second
-min_radius = 280.0                # stops shrinking here
+rate = { min = 9.5, max = 11.5 }  # Arena radius lost per second
+min_radius = 60.0                 # the ball's radius: arena_filled ends it here
 
 [[rules]]
 kind = "change_colour"
@@ -30,19 +38,18 @@ kind = "change_colour"
 [[rules]]
 kind = "play_note"
 
-# The payoff: the Boundary stops closing in.
+# The payoff: the Boundary squeezes the ball.
 [end_condition]
-kind = "arena_min_reached"
-min_radius = 280.0
+kind = "arena_filled"
 
 # Seeds outside these are rejected and replaced. Durations are Video length
 # in seconds (action plus the ~1.5 s ending hold).
 [quality_gate]
 min_duration = 30.0
 max_duration = 45.0
-min_boundary_hits = 50
+min_boundary_hits = 200
 
 [meta]
 title = "The Arena is shrinking - {boundary_hits} bounces later..."
-description = "The Boundary closes in at {rules[0].rate} units a second, so the bounces come faster and faster."
+description = "The Boundary closes in at {rules[1].rate} units a second, so the bounces come faster and faster."
 hashtags = ["shrinking", "tension"]

@@ -1,13 +1,14 @@
 //! Render: anti-aliased CPU raster of the simulation state with tiny-skia.
 //!
-//! The renderer is fed a [`Simulation`] after each frame's substeps (see
-//! [`crate::pipeline`]); it never advances physics itself, so anything that
-//! drives a `Simulation` frame by frame (the encoder, a preview window) gets
-//! identical frames.
+//! The renderer is fed a [`Simulation`] after each frame's substeps, with its
+//! [`Ending`] (see [`crate::pipeline`]); it never advances physics itself, so
+//! anything that drives a `Simulation` frame by frame (the encoder, a preview
+//! window) gets identical frames, Ending effects included.
 //!
 //! Draw order: background, fading trails, Boundary, hit glows, balls, Hook
-//! Title, Counter. Trails and glows are clipped to the Arena (Boundary included).
-//! With Heat on, the Heat field takes the place of trails and balls.
+//! Title, Counter, then the Ending's flash over everything. Trails and glows
+//! are clipped to the Arena (Boundary included). With Heat on, the Heat field
+//! takes the place of trails and balls.
 
 mod heat;
 pub mod layout;
@@ -21,7 +22,7 @@ use tiny_skia::{
 use crate::look::palette::{Palette, Rgb};
 use crate::look::{Counter, LookSpec};
 use crate::scenario::Scenario;
-use crate::sim::{Ball, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
+use crate::sim::{Ball, Ending, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
 use heat::Heat;
 use text::{FittedText, TextPainter};
 
@@ -89,7 +90,8 @@ pub struct Renderer {
     heat: Option<Heat>,
     glow: bool,
     /// Render time of the next frame, in substeps. It keeps running through
-    /// the ending's hold while the simulation is frozen, so glows fade out.
+    /// the ending's hold while the simulation is frozen, so glows fade out
+    /// and the frame knows where in the Ending it falls.
     clock: u64,
     /// Clip for trails and glows: the Arena inside the Boundary's outer
     /// edge, with the Boundary radius (px) it was built for.
@@ -140,13 +142,15 @@ impl Renderer {
         )
     }
 
-    /// Draws one frame of the simulation's current state and returns it as
-    /// RGBA bytes (width * height * 4). Call once per frame, in order: trails
-    /// depend on the previous frames drawn.
+    /// Draws one Video frame of the simulation's current state and returns it
+    /// as RGBA bytes (width * height * 4). Call once per frame, in order:
+    /// trails depend on the previous frames drawn, and the frame's place in
+    /// the `ending` (`None` while it is not yet known, as in the preview
+    /// before the End Condition fires) comes from how many frames came before.
     ///
     /// tiny-skia stores premultiplied RGBA; the background is opaque so every
     /// pixel is opaque and premultiplied equals straight alpha.
-    pub fn draw(&mut self, sim: &Simulation) -> &[u8] {
+    pub fn draw(&mut self, sim: &Simulation, ending: Option<&Ending>) -> &[u8] {
         let palette = sim.palette();
         let now = self.clock.max(sim.substep());
         self.clock = now + SUBSTEPS_PER_FRAME;
@@ -166,6 +170,9 @@ impl Renderer {
             self.draw_balls(sim, palette);
         }
         self.draw_text(sim, palette);
+        if let Some(ending) = ending {
+            self.draw_flash(ending.flash_at(now));
+        }
 
         self.frame()
     }
@@ -417,9 +424,9 @@ impl Renderer {
         );
     }
 
-    /// Washes the frame last drawn with the ending's flash (`strength` 0..=1,
-    /// from [`crate::sim::Ending::flash_at`]) and returns it as RGBA bytes.
-    pub fn flash(&mut self, strength: f32) -> &[u8] {
+    /// Washes the frame with the ending's flash (`strength` 0..=1, from
+    /// [`Ending::flash_at`]).
+    fn draw_flash(&mut self, strength: f32) {
         let alpha = (strength.clamp(0.0, 1.0) * FLASH_MAX_ALPHA * 255.0).round() as u8;
         if alpha > 0 {
             let [r, g, b] = FLASH;
@@ -430,6 +437,5 @@ impl Renderer {
             self.pixmap
                 .fill_rect(full, &paint, Transform::identity(), None);
         }
-        self.pixmap.data()
     }
 }

@@ -79,7 +79,8 @@ fn ball_caught_by_the_closing_boundary_registers_a_boundary_hit() {
 #[test]
 fn invalid_parameters_are_rejected_with_clear_errors() {
     let error_for = |toml: &str| {
-        Scenario::from_toml_str("broken", toml)
+        let toml = format!("{toml}\n[end_condition]\nkind = \"time_cap\"\n");
+        Scenario::from_toml_str("broken", &toml)
             .expect_err("Scenario should be rejected")
             .to_string()
     };

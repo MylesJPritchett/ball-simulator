@@ -12,7 +12,7 @@ use serde::Deserialize;
 
 use super::{params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
-use crate::sim::{BoundaryHit, World};
+use crate::sim::{BoundaryHit, SimState};
 
 /// Smallest radius when a Scenario doesn't set one: still clearly visible.
 pub const DEFAULT_MIN_RADIUS: f64 = 4.0;
@@ -53,12 +53,12 @@ impl Shrink {
 impl Rule for Shrink {
     fn on_boundary_hit(
         &mut self,
-        world: &mut World,
+        state: &mut SimState,
         ball: usize,
         _hit: &mut BoundaryHit,
         _ctx: &mut RuleContext,
     ) {
-        let ball = &mut world.balls[ball];
+        let ball = &mut state.balls[ball];
         // A ball already below the minimum (e.g. its starting size) is left as is.
         if ball.radius > self.min_radius {
             ball.radius = (ball.radius - self.amount).max(self.min_radius);

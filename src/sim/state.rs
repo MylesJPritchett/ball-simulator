@@ -91,15 +91,15 @@ pub struct Ball {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct World {
+pub struct SimState {
     pub arena: Arena,
     pub balls: Vec<Ball>,
     next_ball_id: u32,
 }
 
-impl World {
+impl SimState {
     pub fn new(arena: Arena) -> Self {
-        World {
+        SimState {
             arena,
             balls: Vec::new(),
             next_ball_id: 0,

@@ -11,7 +11,7 @@ use serde::Deserialize;
 
 use super::{params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
-use crate::sim::World;
+use crate::sim::SimState;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -50,8 +50,8 @@ impl ShrinkingArena {
 }
 
 impl Rule for ShrinkingArena {
-    fn on_substep(&mut self, world: &mut World, ctx: &mut RuleContext) {
-        let arena = &mut world.arena;
+    fn on_substep(&mut self, state: &mut SimState, ctx: &mut RuleContext) {
+        let arena = &mut state.arena;
         if arena.radius > self.min_radius {
             arena.radius = (arena.radius - self.rate * ctx.dt).max(self.min_radius);
         }

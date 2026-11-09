@@ -13,7 +13,7 @@ use serde::Deserialize;
 
 use super::{params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
-use crate::sim::{BoundaryHit, World};
+use crate::sim::{BoundaryHit, SimState};
 
 pub struct PlayNote;
 
@@ -31,7 +31,7 @@ impl PlayNote {
 impl Rule for PlayNote {
     fn on_boundary_hit(
         &mut self,
-        _world: &mut World,
+        _state: &mut SimState,
         _ball: usize,
         hit: &mut BoundaryHit,
         _ctx: &mut RuleContext,

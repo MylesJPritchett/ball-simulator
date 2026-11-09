@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 use super::{params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
-use crate::sim::{BoundaryHit, World};
+use crate::sim::{BoundaryHit, SimState};
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -35,11 +35,11 @@ impl Grow {
 impl Rule for Grow {
     fn on_boundary_hit(
         &mut self,
-        world: &mut World,
+        state: &mut SimState,
         ball: usize,
         _hit: &mut BoundaryHit,
         _ctx: &mut RuleContext,
     ) {
-        world.balls[ball].radius += self.amount;
+        state.balls[ball].radius += self.amount;
     }
 }

@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use super::{params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
-use crate::sim::{BoundaryHit, World};
+use crate::sim::{BoundaryHit, SimState};
 
 pub struct SpeedUp {
     /// Velocity multiplier applied on each Boundary Hit (1 + percent / 100).
@@ -33,12 +33,12 @@ impl SpeedUp {
 impl Rule for SpeedUp {
     fn on_boundary_hit(
         &mut self,
-        world: &mut World,
+        state: &mut SimState,
         ball: usize,
         _hit: &mut BoundaryHit,
         _ctx: &mut RuleContext,
     ) {
-        let ball = &mut world.balls[ball];
+        let ball = &mut state.balls[ball];
         ball.vel = ball.vel * self.factor;
     }
 }

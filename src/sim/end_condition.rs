@@ -7,7 +7,7 @@
 use serde::Deserialize;
 
 use crate::scenario::{RuleSpec, Scenario};
-use crate::sim::World;
+use crate::sim::SimState;
 
 pub const TIME_CAP: &str = "time_cap";
 pub const POPULATION_CAP: &str = "population_cap";
@@ -21,7 +21,7 @@ pub trait EndCondition {
     fn id(&self) -> &'static str;
 
     /// Checked at the end of every substep, after Rules have run.
-    fn is_met(&self, world: &World, substep: u64) -> bool;
+    fn is_met(&self, state: &SimState, substep: u64) -> bool;
 }
 
 /// Builds the Scenario's extra End Condition, if any. `time_cap` (or none)
@@ -96,8 +96,8 @@ impl EndCondition for PopulationCap {
         POPULATION_CAP
     }
 
-    fn is_met(&self, world: &World, _substep: u64) -> bool {
-        world.balls.len() >= self.cap
+    fn is_met(&self, state: &SimState, _substep: u64) -> bool {
+        state.balls.len() >= self.cap
     }
 }
 
@@ -110,11 +110,11 @@ impl EndCondition for ArenaFilled {
         ARENA_FILLED
     }
 
-    fn is_met(&self, world: &World, _substep: u64) -> bool {
-        world
+    fn is_met(&self, state: &SimState, _substep: u64) -> bool {
+        state
             .balls
             .iter()
-            .any(|ball| ball.radius >= world.arena.radius)
+            .any(|ball| ball.radius >= state.arena.radius)
     }
 }
 
@@ -133,9 +133,9 @@ impl EndCondition for MaxSpeedReached {
         MAX_SPEED_REACHED
     }
 
-    fn is_met(&self, world: &World, _substep: u64) -> bool {
+    fn is_met(&self, state: &SimState, _substep: u64) -> bool {
         let limit = self.max_speed * AT_LIMIT;
-        world.balls.iter().any(|ball| ball.vel.length() >= limit)
+        state.balls.iter().any(|ball| ball.vel.length() >= limit)
     }
 }
 
@@ -149,8 +149,8 @@ impl EndCondition for MinRadiusReached {
         MIN_RADIUS_REACHED
     }
 
-    fn is_met(&self, world: &World, _substep: u64) -> bool {
-        world
+    fn is_met(&self, state: &SimState, _substep: u64) -> bool {
+        state
             .balls
             .iter()
             .any(|ball| ball.radius <= self.min_radius)
@@ -168,7 +168,7 @@ impl EndCondition for ArenaMinReached {
         ARENA_MIN_REACHED
     }
 
-    fn is_met(&self, world: &World, _substep: u64) -> bool {
-        world.arena.radius <= self.min_radius
+    fn is_met(&self, state: &SimState, _substep: u64) -> bool {
+        state.arena.radius <= self.min_radius
     }
 }

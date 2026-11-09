@@ -21,9 +21,9 @@ impl Counter {
     pub fn read(self, sim: &Simulation) -> u64 {
         match self {
             Counter::BoundaryHits => sim.boundary_hits().len() as u64,
-            Counter::BallCount => sim.world().balls.len() as u64,
+            Counter::BallCount => sim.state().balls.len() as u64,
             Counter::Speed => sim
-                .world()
+                .state()
                 .balls
                 .iter()
                 .map(|b| b.vel.length())

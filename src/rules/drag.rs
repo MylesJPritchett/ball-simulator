@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use super::{params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
-use crate::sim::World;
+use crate::sim::SimState;
 
 pub struct Drag {
     /// Decay rate per second: speed follows `v0 * e^(-strength * t)`.
@@ -30,9 +30,9 @@ impl Drag {
 }
 
 impl Rule for Drag {
-    fn on_substep(&mut self, world: &mut World, ctx: &mut RuleContext) {
+    fn on_substep(&mut self, state: &mut SimState, ctx: &mut RuleContext) {
         let factor = (-self.strength * ctx.dt).exp();
-        for ball in &mut world.balls {
+        for ball in &mut state.balls {
             ball.vel = ball.vel * factor;
         }
     }

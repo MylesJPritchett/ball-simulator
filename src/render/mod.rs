@@ -179,7 +179,7 @@ impl Renderer {
     }
 
     fn draw_trails(&mut self, sim: &Simulation, palette: &Palette) {
-        let balls = &sim.world().balls;
+        let balls = &sim.state().balls;
         let segments: Vec<_> = balls
             .iter()
             .map(|ball| {
@@ -238,7 +238,7 @@ impl Renderer {
     }
 
     fn boundary_radius(&self, sim: &Simulation) -> f32 {
-        sim.world().arena.radius as f32 * self.scale
+        sim.state().arena.radius as f32 * self.scale
     }
 
     fn draw_boundary(&mut self, sim: &Simulation, palette: &Palette) {
@@ -265,7 +265,7 @@ impl Renderer {
     /// clipped to the Arena.
     fn draw_glows(&mut self, sim: &Simulation, palette: &Palette, now: u64) {
         let boundary = self.boundary_radius(sim) + BOUNDARY_WIDTH / 2.0;
-        let balls = &sim.world().balls;
+        let balls = &sim.state().balls;
         let mut glows: Vec<(&crate::sim::BoundaryHit, f32, f32)> = Vec::new();
         for hit in sim
             .boundary_hits()
@@ -337,7 +337,7 @@ impl Renderer {
             anti_alias: true,
             ..Paint::default()
         };
-        for ball in &sim.world().balls {
+        for ball in &sim.state().balls {
             let (x, y) = self.to_screen(ball.pos.x, ball.pos.y);
             paint.shader = Shader::SolidColor(rgb(palette.ball(ball_slot(ball))));
             if let Some(circle) = PathBuilder::from_circle(x, y, ball.radius as f32 * self.scale) {

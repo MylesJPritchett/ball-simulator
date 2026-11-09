@@ -22,7 +22,7 @@ use serde::de::DeserializeOwned;
 
 use crate::scenario::{RuleSpec, Scenario};
 use crate::sim::rng::Rng;
-use crate::sim::{BoundaryHit, World};
+use crate::sim::{BoundaryHit, SimState};
 
 /// Per-call context handed to Rules by the simulation.
 pub struct RuleContext<'a> {
@@ -41,14 +41,14 @@ pub struct RuleContext<'a> {
 /// `on_boundary_hit` for each Boundary Hit (in ball order, Rules in Scenario order).
 pub trait Rule {
     /// Called once per substep before balls move (forces, Arena changes, ...).
-    fn on_substep(&mut self, _world: &mut World, _ctx: &mut RuleContext) {}
+    fn on_substep(&mut self, _state: &mut SimState, _ctx: &mut RuleContext) {}
 
     /// Called for each Boundary Hit after the ball has been reflected and pushed
-    /// back inside. `ball` is the ball's index in `world.balls`. Rules may append
-    /// balls to `world.balls` (e.g. split); they must not remove or reorder balls.
+    /// back inside. `ball` is the ball's index in `state.balls`. Rules may append
+    /// balls to `state.balls` (e.g. split); they must not remove or reorder balls.
     fn on_boundary_hit(
         &mut self,
-        _world: &mut World,
+        _state: &mut SimState,
         _ball: usize,
         _hit: &mut BoundaryHit,
         _ctx: &mut RuleContext,

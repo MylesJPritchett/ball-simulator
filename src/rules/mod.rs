@@ -13,6 +13,7 @@ mod drag;
 mod gravity;
 mod shrinking_arena;
 mod speed_up;
+mod split;
 
 use serde::de::DeserializeOwned;
 
@@ -60,6 +61,7 @@ pub fn build(spec: &RuleSpec) -> Result<Box<dyn Rule>, String> {
         "speed_up" => Ok(Box::new(speed_up::SpeedUp::from_spec(spec)?)),
         "change_colour" => Ok(Box::new(change_colour::ChangeColour::from_spec(spec)?)),
         "shrinking_arena" => Ok(Box::new(shrinking_arena::ShrinkingArena::from_spec(spec)?)),
+        "split" => Ok(Box::new(split::Split::from_spec(spec)?)),
         other => Err(format!("unknown Rule '{other}'")),
     }
 }

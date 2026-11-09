@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use crate::render::Renderer;
 use crate::scenario::Scenario;
-use crate::sim::Simulation;
+use crate::sim::{Ending, Simulation, SUBSTEPS_PER_FRAME};
 
 /// Outcome of [`Preview::check_for_changes`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,7 +105,14 @@ impl Preview {
     /// draws it. `None` until a valid Scenario has been loaded.
     pub fn frame(&mut self) -> Option<&[u8]> {
         let running = self.running.as_mut()?;
-        Some(running.renderer.draw(running.sim.world()))
+        running.renderer.draw(running.sim.world());
+        // The ending's flash, timed from the frame the End Condition fired on.
+        let flash = if running.sim.is_ended() {
+            Ending::new(0).flash_at(running.held * SUBSTEPS_PER_FRAME)
+        } else {
+            0.0
+        };
+        Some(running.renderer.flash(flash))
     }
 
     /// Loads `contents` as the Scenario; returns whether it succeeded. On

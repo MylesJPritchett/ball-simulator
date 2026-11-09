@@ -1,13 +1,16 @@
 //! Render: anti-aliased CPU raster of the simulation state with tiny-skia.
 //!
-//! The renderer is fed a [`Simulation`] after each frame's substeps (see
-//! [`crate::pipeline`]); it never advances physics itself, so anything that
-//! drives a `Simulation` frame by frame (the encoder, a preview window) gets
-//! identical frames.
+//! The renderer is fed a [`Simulation`] after each frame's substeps, with its
+//! [`Ending`] (see [`crate::pipeline`]); it never advances physics itself, so
+//! anything that drives a `Simulation` frame by frame (the encoder, a preview
+//! window) gets identical frames, Ending effects included.
 //!
 //! Draw order: background, fading trails, Boundary, hit glows, balls, Hook
-//! Title, Counter. Trails and glows are clipped to the Arena (Boundary included).
+//! Title, Counter, then the Ending's flash over everything. Trails and glows
+//! are clipped to the Arena (Boundary included). With Heat on, the Heat field
+//! takes the place of trails and balls.
 
+mod heat;
 pub mod layout;
 pub mod text;
 
@@ -19,7 +22,8 @@ use tiny_skia::{
 use crate::look::palette::{Palette, Rgb};
 use crate::look::{Counter, LookSpec};
 use crate::scenario::Scenario;
-use crate::sim::{Ball, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
+use crate::sim::{Ball, Ending, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
+use heat::Heat;
 use text::{FittedText, TextPainter};
 
 const BOUNDARY_WIDTH: f32 = 6.0;
@@ -82,9 +86,12 @@ pub struct Renderer {
     trails: Option<Pixmap>,
     /// Each ball's position on screen last frame, indexed by ball id.
     last_pos: Vec<Option<(f32, f32)>>,
+    /// Ball overlap density, drawn instead of trails and balls when on.
+    heat: Option<Heat>,
     glow: bool,
     /// Render time of the next frame, in substeps. It keeps running through
-    /// the ending's hold while the simulation is frozen, so glows fade out.
+    /// the ending's hold while the simulation is frozen, so glows fade out
+    /// and the frame knows where in the Ending it falls.
     clock: u64,
     /// Clip for trails and glows: the Arena inside the Boundary's outer
     /// edge, with the Boundary radius (px) it was built for.
@@ -104,20 +111,23 @@ impl Renderer {
         let LookSpec {
             trails,
             glow,
+            heat,
             counter,
             ..
         } = scenario.look;
         let text = TextPainter::new();
         let title = text.fit(&scenario.hook_title, layout::hook_title(), TITLE_MAX_PX);
+        let scale = arena.radius / scenario.arena.radius as f32;
         Renderer {
             pixmap: Pixmap::new(layout::WIDTH, layout::HEIGHT).expect("non-zero frame size"),
-            trails: trails
+            trails: (trails && !heat)
                 .then(|| Pixmap::new(layout::WIDTH, layout::HEIGHT).expect("non-zero frame size")),
             last_pos: Vec::new(),
+            heat: heat.then(|| Heat::new(scenario)),
             glow,
             clock: 0,
             clip: None,
-            scale: arena.radius / scenario.arena.radius as f32,
+            scale,
             arena,
             text,
             title,
@@ -132,28 +142,37 @@ impl Renderer {
         )
     }
 
-    /// Draws one frame of the simulation's current state and returns it as
-    /// RGBA bytes (width * height * 4). Call once per frame, in order: trails
-    /// depend on the previous frames drawn.
+    /// Draws one Video frame of the simulation's current state and returns it
+    /// as RGBA bytes (width * height * 4). Call once per frame, in order:
+    /// trails depend on the previous frames drawn, and the frame's place in
+    /// the `ending` (`None` while it is not yet known, as in the preview
+    /// before the End Condition fires) comes from how many frames came before.
     ///
     /// tiny-skia stores premultiplied RGBA; the background is opaque so every
     /// pixel is opaque and premultiplied equals straight alpha.
-    pub fn draw(&mut self, sim: &Simulation) -> &[u8] {
+    pub fn draw(&mut self, sim: &Simulation, ending: Option<&Ending>) -> &[u8] {
         let palette = sim.palette();
         let now = self.clock.max(sim.substep());
         self.clock = now + SUBSTEPS_PER_FRAME;
         self.pixmap.fill(rgb(palette.background));
         self.update_clip(sim);
 
-        if self.trails.is_some() {
+        if self.heat.is_some() {
+            self.draw_heat(sim, palette);
+        } else if self.trails.is_some() {
             self.draw_trails(sim, palette);
         }
         self.draw_boundary(sim, palette);
         if self.glow {
             self.draw_glows(sim, palette, now);
         }
-        self.draw_balls(sim, palette);
+        if self.heat.is_none() {
+            self.draw_balls(sim, palette);
+        }
         self.draw_text(sim, palette);
+        if let Some(ending) = ending {
+            self.draw_flash(ending.flash_at(now));
+        }
 
         self.frame()
     }
@@ -237,6 +256,17 @@ impl Renderer {
         );
     }
 
+    fn draw_heat(&mut self, sim: &Simulation, palette: &Palette) {
+        let heat = self.heat.as_mut().expect("heat is on");
+        heat.clear();
+        for ball in &sim.state().balls {
+            let x = self.arena.center_x + ball.pos.x as f32 * self.scale;
+            let y = self.arena.center_y + ball.pos.y as f32 * self.scale;
+            heat.add_ball(x, y, ball.radius as f32 * self.scale);
+        }
+        heat.paint(&mut self.pixmap, palette);
+    }
+
     fn boundary_radius(&self, sim: &Simulation) -> f32 {
         sim.state().arena.radius as f32 * self.scale
     }
@@ -291,9 +321,11 @@ impl Renderer {
         for (hit, x, y) in glows {
             let t = (now - hit.substep) as f32 / GLOW_SUBSTEPS as f32;
             let strength = (1.0 - t) * (1.0 - t);
-            // Balls are only ever appended, so a ball's id is its index.
+            // Balls are only ever appended, so a ball's id is its index. Heat
+            // draws no per-ball colour, so its glows take the Boundary's.
             let colour = balls
                 .get(hit.ball_id as usize)
+                .filter(|_| self.heat.is_none())
                 .filter(|b| b.id == hit.ball_id)
                 .map(|b| palette.ball(ball_slot(b)))
                 .unwrap_or(palette.boundary);
@@ -392,9 +424,9 @@ impl Renderer {
         );
     }
 
-    /// Washes the frame last drawn with the ending's flash (`strength` 0..=1,
-    /// from [`crate::sim::Ending::flash_at`]) and returns it as RGBA bytes.
-    pub fn flash(&mut self, strength: f32) -> &[u8] {
+    /// Washes the frame with the ending's flash (`strength` 0..=1, from
+    /// [`Ending::flash_at`]).
+    fn draw_flash(&mut self, strength: f32) {
         let alpha = (strength.clamp(0.0, 1.0) * FLASH_MAX_ALPHA * 255.0).round() as u8;
         if alpha > 0 {
             let [r, g, b] = FLASH;
@@ -405,6 +437,5 @@ impl Renderer {
             self.pixmap
                 .fill_rect(full, &paint, Transform::identity(), None);
         }
-        self.pixmap.data()
     }
 }

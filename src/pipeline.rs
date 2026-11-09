@@ -8,7 +8,7 @@ use crate::encode::{EncodeError, VideoEncoder};
 use crate::meta::VideoMeta;
 use crate::render::{layout, Renderer};
 use crate::scenario::Scenario;
-use crate::sim::{self, Rejection, SimRecord, Simulation, FPS, SUBSTEPS_PER_FRAME};
+use crate::sim::{self, Rejection, SimRecord, Simulation, FPS};
 
 #[derive(Debug, thiserror::Error)]
 pub enum GenerateError {
@@ -176,10 +176,9 @@ fn render(
     let mut renderer = Renderer::new(sim.scenario());
     // Frame k shows the state after k * SUBSTEPS_PER_FRAME substeps; once the
     // run has ended `step_frame` does nothing, so the action freezes, the
-    // trails keep fading and the flash plays over the frozen frame.
-    for frame in 0..frames {
-        renderer.draw(&sim);
-        encoder.write_frame(renderer.flash(ending.flash_at(frame * SUBSTEPS_PER_FRAME)))?;
+    // trails keep fading and the renderer plays the flash over the frozen frame.
+    for _ in 0..frames {
+        encoder.write_frame(renderer.draw(&sim, Some(&ending)))?;
         sim.step_frame();
     }
     encoder.finish()?;

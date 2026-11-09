@@ -7,6 +7,7 @@
 //! palette = "neon"          # optional; omitted = chosen by the Seed
 //! trails = true             # fading motion trails (default true)
 //! glow = true               # glow where each Boundary Hit lands (default true)
+//! heat = false              # colour by how many balls overlap (default false)
 //! counter = "ball_count"    # "boundary_hits" (default), "ball_count" or "speed"
 //! ```
 
@@ -25,6 +26,9 @@ pub struct LookSpec {
     pub palette: Option<String>,
     pub trails: bool,
     pub glow: bool,
+    /// Draw Heat (ball overlap density) instead of each ball; trails and
+    /// per-ball colour are not drawn while it is on.
+    pub heat: bool,
     pub counter: Counter,
 }
 
@@ -34,6 +38,7 @@ impl Default for LookSpec {
             palette: None,
             trails: true,
             glow: true,
+            heat: false,
             counter: Counter::default(),
         }
     }

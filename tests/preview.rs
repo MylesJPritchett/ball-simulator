@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use ball_simulator::preview::{Preview, Reload};
 use ball_simulator::render::{layout, Renderer};
-use ball_simulator::sim::{Simulation, SUBSTEPS_PER_FRAME};
+use ball_simulator::sim::Simulation;
 
 /// `support::MINIMAL` plus an End Condition: a complete Scenario file.
 fn minimal() -> String {
@@ -26,15 +26,16 @@ fn scenario_file(name: &str, contents: &str) -> PathBuf {
 }
 
 /// The frame the Video renderer produces after `frames` frames, drawing every
-/// frame on the way as the pipeline does (trails build up over frames).
+/// frame on the way as the pipeline does (trails build up over frames), with
+/// no Ending (so no flash).
 fn rendered_frame(toml: &str, seed: u64, frames: u64) -> Vec<u8> {
     let scenario = support::scenario(toml);
     let mut sim = Simulation::new(&scenario, seed);
     let mut renderer = Renderer::new(sim.scenario());
-    renderer.draw(&sim);
+    renderer.draw(&sim, None);
     for _ in 0..frames {
         sim.step_frame();
-        renderer.draw(&sim);
+        renderer.draw(&sim, None);
     }
     renderer.frame().to_vec()
 }
@@ -50,8 +51,7 @@ fn video_frame(toml: &str, seed: u64, frame: u64) -> Vec<u8> {
         if k > 0 {
             sim.step_frame();
         }
-        renderer.draw(&sim);
-        renderer.flash(ending.flash_at(k * SUBSTEPS_PER_FRAME));
+        renderer.draw(&sim, Some(&ending));
     }
     renderer.frame().to_vec()
 }
@@ -73,6 +73,20 @@ fn preview_shows_the_same_frames_as_the_renderer() {
         preview.advance_frame();
     }
     assert!(preview.frame().unwrap() == rendered_frame(&minimal(), 3, 30));
+}
+
+#[test]
+fn preview_shows_heat_the_same_as_the_renderer() {
+    let heat = format!("{}\n[look]\nheat = true\n", minimal());
+    let path = scenario_file("same_heat", &heat);
+    let mut preview = Preview::open(path, 3);
+    for _ in 0..30 {
+        preview.advance_frame();
+    }
+    let frame = preview.frame().expect("a valid Scenario has a frame");
+
+    assert!(frame == rendered_frame(&heat, 3, 30));
+    assert!(frame != rendered_frame(&minimal(), 3, 30), "Heat is drawn");
 }
 
 #[test]

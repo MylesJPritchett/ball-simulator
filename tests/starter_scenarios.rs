@@ -51,6 +51,17 @@ fn every_shipped_scenario_has_its_own_hook_title() {
 }
 
 #[test]
+fn doubling_alone_ships_with_heat() {
+    // gravity_split keeps per-ball colour so it looks different from doubling.
+    let with_heat: Vec<String> = shipped()
+        .into_iter()
+        .filter(|(_, s)| s.look.heat)
+        .map(|(_, s)| s.id)
+        .collect();
+    assert_eq!(with_heat, ["doubling"]);
+}
+
+#[test]
 fn every_shipped_scenario_has_metadata_templates() {
     for (path, scenario) in shipped() {
         let meta = &scenario.meta;

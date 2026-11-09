@@ -55,6 +55,41 @@ fn split_into_three_fans_symmetrically_about_the_reflected_velocity() {
 }
 
 #[test]
+fn split_jitter_varies_each_balls_speed_and_direction_within_its_bounds() {
+    // As the fan test above, but every ball out of the split gets up to ±10%
+    // speed and ±3 degrees off its slot in the fan.
+    let first_hit = run(MINIMAL, SEED).boundary_hits[0].substep;
+    let stop = first_hit as f64 / SUBSTEP_HZ as f64;
+    let reflected = run(&with_time_cap(MINIMAL, stop), SEED).final_balls[0].vel;
+    let toml = with_time_cap(&split(3, 40.0), stop) + "speed_jitter = 0.1\nangle_jitter = 3.0\n";
+
+    let record = run(&toml, SEED);
+
+    let mut angles: Vec<f64> = record
+        .final_balls
+        .iter()
+        .map(|b| {
+            let speed = b.vel.length();
+            assert!((810.0..=990.0).contains(&speed), "speed {speed}");
+            angle_between(reflected, b.vel).to_degrees()
+        })
+        .collect();
+    angles.sort_by(f64::total_cmp);
+    for (got, slot) in angles.iter().zip([-20.0, 0.0, 20.0]) {
+        assert!((got - slot).abs() <= 3.0, "angles {angles:?}");
+    }
+    let speeds: Vec<f64> = record.final_balls.iter().map(|b| b.vel.length()).collect();
+    assert!(
+        speeds.windows(2).all(|w| w[0] != w[1]),
+        "speeds differ: {speeds:?}"
+    );
+    assert!(
+        angles.iter().zip([-20.0, 0.0, 20.0]).any(|(a, s)| a != &s),
+        "directions are jittered: {angles:?}"
+    );
+}
+
+#[test]
 fn split_children_keep_the_parents_colour() {
     let first_hit = run(MINIMAL, SEED).boundary_hits[0].substep;
     let stop = first_hit as f64 / SUBSTEP_HZ as f64;
@@ -134,6 +169,10 @@ fn invalid_split_and_population_cap_values_are_rejected_clearly() {
     assert!(err.contains("into must be at least 2"), "{err}");
     let err = error_for(&split(2, 180.0));
     assert!(err.contains("spread must be between 0 and 180"), "{err}");
+    let err = error_for(&(split(2, 30.0) + "speed_jitter = 1.0\n"));
+    assert!(err.contains("speed_jitter must be less than 1"), "{err}");
+    let err = error_for(&(split(2, 30.0) + "angle_jitter = -2.0\n"));
+    assert!(err.contains("angle_jitter must be a finite number >= 0"), "{err}");
     let err = error_for(&with_cap(MINIMAL, 0));
     assert!(err.contains("population_cap must be at least 1"), "{err}");
 }

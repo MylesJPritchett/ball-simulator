@@ -4,7 +4,7 @@
 
 use serde::Serialize;
 
-use super::{Ball, Ending, SUBSTEP_HZ};
+use super::{Ball, Ending, Verdict, SUBSTEP_HZ};
 
 /// Converts a substep count to seconds since the start of the Video.
 pub fn substep_to_seconds(substep: u64) -> f64 {
@@ -25,6 +25,8 @@ pub struct SimRecord {
     /// Timing of the freeze, flash and hold that follow the End Condition.
     pub ending: Ending,
     pub stats: SimStats,
+    /// The Quality Gate's verdict on this Seed.
+    pub quality_gate: Verdict,
     /// Arena radius when the run ended (differs from the Scenario's if a Rule
     /// changed it, e.g. shrinking_arena).
     pub final_arena_radius: f64,

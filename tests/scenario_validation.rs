@@ -93,3 +93,26 @@ fn errors_from_scenario_files_name_the_file_path() {
     let err = Scenario::from_file(&path).unwrap_err().to_string();
     assert!(err.contains(&path.display().to_string()), "{err}");
 }
+
+#[test]
+fn quality_gate_duration_range_must_not_be_inverted() {
+    let toml = format!(
+        "{}\n[quality_gate]\nmin_duration = 40.0\nmax_duration = 30.0\n",
+        complete()
+    );
+    let err = error_for(&toml);
+    assert!(
+        err.contains("quality_gate.min_duration must not exceed quality_gate.max_duration"),
+        "{err}"
+    );
+}
+
+#[test]
+fn unknown_quality_gate_threshold_is_named_in_the_error() {
+    let toml = format!("{}\n[quality_gate]\nmin_hits = 3\n", complete());
+    let err = error_for(&toml);
+    assert!(
+        err.contains("quality_gate") && err.contains("min_hits"),
+        "{err}"
+    );
+}

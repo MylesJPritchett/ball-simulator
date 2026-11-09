@@ -14,6 +14,10 @@ fn intervals(scale: &str) -> &'static [i64] {
         "minor_pentatonic" => &[0, 3, 5, 7, 10],
         "lydian" => &[0, 2, 4, 6, 7, 9, 11],
         "dorian" => &[0, 2, 3, 5, 7, 9, 10],
+        "mixolydian" => &[0, 2, 4, 5, 7, 9, 10],
+        "aeolian" => &[0, 2, 3, 5, 7, 8, 10],
+        "suspended_pentatonic" => &[0, 2, 5, 7, 10],
+        "hirajoshi" => &[0, 2, 3, 7, 8],
         other => panic!("unknown scale {other}"),
     }
 }
@@ -36,6 +40,18 @@ fn assert_in_scale(record: &SimRecord, pitch: f64) {
         "{pitch} Hz (pitch class {class}) is not in {scale}"
     );
 }
+
+/// Every Scale name a Scenario may pin.
+const SCALES: [&str; 8] = [
+    "major_pentatonic",
+    "minor_pentatonic",
+    "lydian",
+    "dorian",
+    "mixolydian",
+    "aeolian",
+    "suspended_pentatonic",
+    "hirajoshi",
+];
 
 fn with_sound(sound: &str) -> String {
     format!("{MINIMAL}\n[sound]\n{sound}\n")
@@ -62,9 +78,11 @@ fn pitches_are_always_in_the_chosen_scale() {
     let doubling =
         include_str!("../scenarios/doubling.toml").replace("time_cap = 60.0", "time_cap = 8.0");
     for mode in ["step", "ball_size", "angle"] {
-        for seed in 0..6 {
-            let toml = format!("{doubling}\n[sound]\npitch_mode = \"{mode}\"\n");
-            let record = run(&toml, seed);
+        for (seed, scale) in SCALES.into_iter().enumerate() {
+            let toml =
+                format!("{doubling}\n[sound]\npitch_mode = \"{mode}\"\nscale = \"{scale}\"\n");
+            let record = run(&toml, seed as u64);
+            assert_eq!(record.sound.scale.name(), scale);
             assert!(!record.boundary_hits.is_empty());
             for hit in &record.boundary_hits {
                 assert_in_scale(&record, hit.pitch);
@@ -158,13 +176,13 @@ fn boundary_hits_play_notes_only_with_the_play_note_rule() {
 fn instrument_and_scale_vary_by_seed() {
     let mut instruments = std::collections::HashSet::new();
     let mut scales = std::collections::HashSet::new();
-    for seed in 0..30 {
+    for seed in 0..100 {
         let record = run(MINIMAL, seed);
         instruments.insert(record.sound.instrument.name());
         scales.insert(record.sound.scale.name());
     }
     assert_eq!(instruments.len(), 3, "{instruments:?}");
-    assert_eq!(scales.len(), 4, "{scales:?}");
+    assert_eq!(scales.len(), SCALES.len(), "{scales:?}");
 }
 
 #[test]
@@ -175,6 +193,10 @@ fn pinned_instrument_scale_and_pitch_mode_are_respected() {
         assert_eq!(record.sound.instrument.name(), "marimba");
         assert_eq!(record.sound.scale.name(), "lydian");
         assert_eq!(record.sound.pitch_mode.name(), "angle");
+    }
+    for seed in 0..10 {
+        let record = run(&with_sound("scale = \"hirajoshi\""), seed);
+        assert_eq!(record.sound.scale.name(), "hirajoshi");
     }
 }
 
@@ -221,22 +243,33 @@ fn simultaneous_voices_never_exceed_the_cap() {
 #[test]
 fn a_final_chord_plays_when_the_end_condition_fires() {
     use ball_simulator::audio::{voices, SAMPLES_PER_SUBSTEP};
-    let record = run(&with_sound("scale = \"minor_pentatonic\""), 4);
-    let at = (record.ending.start_substep * SAMPLES_PER_SUBSTEP) as usize;
+    for scale in SCALES {
+        let record = run(&with_sound(&format!("scale = \"{scale}\"")), 4);
+        assert_eq!(record.sound.scale.name(), scale);
+        let at = (record.ending.start_substep * SAMPLES_PER_SUBSTEP) as usize;
 
-    let chord: Vec<f64> = voices(&record)
-        .iter()
-        .filter(|v| v.start == at)
-        .map(|v| v.pitch)
-        .collect();
-    assert!(chord.len() >= 3, "chord has {} notes", chord.len());
-    for &pitch in &chord {
-        assert_in_scale(&record, pitch);
+        let chord: Vec<f64> = voices(&record)
+            .iter()
+            .filter(|v| v.start == at)
+            .map(|v| v.pitch)
+            .collect();
+        for &pitch in &chord {
+            assert_in_scale(&record, pitch);
+        }
+        let mut distinct = chord.clone();
+        distinct.sort_by(f64::total_cmp);
+        distinct.dedup();
+        assert_eq!(
+            distinct.len(),
+            chord.len(),
+            "{scale}: chord notes are distinct"
+        );
+        assert!(
+            distinct.len() >= 3,
+            "{scale}: chord has {} notes",
+            distinct.len()
+        );
     }
-    let mut distinct = chord.clone();
-    distinct.sort_by(f64::total_cmp);
-    distinct.dedup();
-    assert_eq!(distinct.len(), chord.len(), "chord notes are distinct");
 }
 
 #[test]

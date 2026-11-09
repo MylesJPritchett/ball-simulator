@@ -19,3 +19,10 @@ min_radius = 80.0     # stops shrinking here
 
 [end_condition]
 kind = "time_cap"
+
+# Seeds outside these are rejected and replaced. Durations are Video length
+# in seconds (action plus the ~1.5 s ending hold).
+[quality_gate]
+min_duration = 40.0
+max_duration = 42.0
+min_boundary_hits = 300

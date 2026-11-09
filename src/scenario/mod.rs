@@ -52,6 +52,8 @@ pub struct Scenario {
     pub rules: Vec<RuleSpec>,
     /// Required in files, so always `Some` once parsed.
     pub end_condition: Option<RuleSpec>,
+    /// Thresholds a Seed must meet to be rendered.
+    pub quality_gate: QualityGateSpec,
     /// The file as written, ranges included.
     template: toml::Table,
     /// For error messages: the file path, or the id for inline Scenarios.
@@ -85,6 +87,28 @@ fn default_max_speed() -> f64 {
     DEFAULT_MAX_SPEED
 }
 
+/// Quality Gate thresholds (`[quality_gate]`, optional). Durations are Video
+/// length in seconds (the action plus the ending's hold). Each defaults to
+/// no limit; an End Condition that never fires before the time cap is always
+/// rejected.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct QualityGateSpec {
+    pub min_duration: f64,
+    pub max_duration: f64,
+    pub min_boundary_hits: usize,
+}
+
+impl Default for QualityGateSpec {
+    fn default() -> Self {
+        QualityGateSpec {
+            min_duration: 0.0,
+            max_duration: f64::INFINITY,
+            min_boundary_hits: 0,
+        }
+    }
+}
+
 /// A `kind` plus free-form parameters. Used for both Rules and End Conditions.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct RuleSpec {
@@ -106,6 +130,8 @@ struct ScenarioFile {
     #[serde(default)]
     rules: Vec<RuleSpec>,
     end_condition: Option<RuleSpec>,
+    #[serde(default)]
+    quality_gate: QualityGateSpec,
     #[serde(default)]
     look: LookSpec,
 }
@@ -180,6 +206,7 @@ impl Scenario {
             ball: file_data.ball,
             rules: file_data.rules,
             end_condition: Some(end_condition),
+            quality_gate: file_data.quality_gate,
             look: file_data.look,
             template: table,
             file: file.to_string(),
@@ -229,6 +256,17 @@ impl Scenario {
         self.look.validate().map_err(|m| self.invalid(m))?;
         if !(self.ball.max_speed.is_finite() && self.ball.max_speed > 0.0) {
             return Err(self.invalid("ball.max_speed must be a finite number greater than 0"));
+        }
+        let gate = &self.quality_gate;
+        if !(gate.min_duration >= 0.0 && gate.max_duration > 0.0) {
+            return Err(self.invalid(
+                "quality_gate.min_duration must be at least 0 and max_duration greater than 0",
+            ));
+        }
+        if gate.min_duration > gate.max_duration {
+            return Err(
+                self.invalid("quality_gate.min_duration must not exceed quality_gate.max_duration")
+            );
         }
         // Building Rules and End Conditions validates their kinds and parameters.
         for (i, spec) in self.rules.iter().enumerate() {

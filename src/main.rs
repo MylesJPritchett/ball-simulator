@@ -24,7 +24,7 @@ enum Command {
         /// The Video's Seed; with `--count`, the batch Seed (default: from the clock).
         #[arg(long)]
         seed: Option<u64>,
-        /// Number of Videos to make from Scenarios picked at random.
+        /// Number of Videos to make, cycling through the Scenarios in shuffled order.
         #[arg(long, conflicts_with = "scenario")]
         count: Option<usize>,
         /// Folder of Scenario files a batch picks from.

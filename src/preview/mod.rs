@@ -115,9 +115,12 @@ impl Preview {
         self.last_contents = contents;
         match result {
             Ok(scenario) => {
+                let sim = Simulation::new(&scenario, self.seed);
+                // The Arena radius may be a range: use the Seed's resolved one.
+                let renderer = Renderer::new(sim.world().arena.radius);
                 self.running = Some(Running {
-                    sim: Simulation::new(&scenario, self.seed),
-                    renderer: Renderer::new(scenario.arena.radius),
+                    sim,
+                    renderer,
                     held: 0,
                     scenario,
                 });

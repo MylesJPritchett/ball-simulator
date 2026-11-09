@@ -3,10 +3,19 @@
 //! A Scenario is a TOML file. Rules are listed as `[[rules]]` tables with a
 //! `kind` key; all other keys in the table are that Rule's parameters and are
 //! interpreted by the Rule itself (see [`crate::rules`]).
+//!
+//! Any numeric value may be a range (see [`range`]); a parsed [`Scenario`] keeps
+//! its ranges and [`Scenario::resolve`] turns it into concrete values for a Seed.
+
+mod range;
 
 use std::path::Path;
 
 use serde::Deserialize;
+
+use crate::sim::rng::Rng;
+use range::Pick;
+pub use range::{ParamValue, ResolvedParam};
 
 /// Errors from loading or validating a Scenario.
 #[derive(Debug, thiserror::Error)]
@@ -16,13 +25,16 @@ pub enum ScenarioError {
         path: String,
         source: std::io::Error,
     },
-    #[error("invalid Scenario '{id}': {message}")]
-    Parse { id: String, message: String },
-    #[error("invalid Scenario '{id}': {message}")]
-    Invalid { id: String, message: String },
+    /// `file` is the Scenario file path, or the id for inline Scenarios.
+    #[error("invalid Scenario file {file}: {message}")]
+    Parse { file: String, message: String },
+    #[error("invalid Scenario file {file}: {message}")]
+    Invalid { file: String, message: String },
 }
 
-/// A parsed, validated Scenario with concrete values.
+/// A parsed, validated Scenario. If the file has ranges, the fields below
+/// hold every range at its lower bound; use [`Scenario::resolve`] (which
+/// [`crate::sim::run`] does) for a Seed's concrete values.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scenario {
     /// Identifier used in output folder names; the file stem for Scenario files.
@@ -35,7 +47,12 @@ pub struct Scenario {
     pub arena: ArenaSpec,
     pub ball: BallSpec,
     pub rules: Vec<RuleSpec>,
+    /// Required in files, so always `Some` once parsed.
     pub end_condition: Option<RuleSpec>,
+    /// The file as written, ranges included.
+    template: toml::Table,
+    /// For error messages: the file path, or the id for inline Scenarios.
+    file: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -86,39 +103,99 @@ struct ScenarioFile {
 
 impl Scenario {
     pub fn from_toml_str(id: &str, toml_src: &str) -> Result<Self, ScenarioError> {
-        let file: ScenarioFile = toml::from_str(toml_src).map_err(|e| ScenarioError::Parse {
-            id: id.to_string(),
-            message: e.to_string(),
-        })?;
-        let scenario = Scenario {
-            id: id.to_string(),
-            hook_title: file.hook_title.unwrap_or_else(|| file.name.clone()),
-            name: file.name,
-            time_cap: file.time_cap,
-            arena: file.arena,
-            ball: file.ball,
-            rules: file.rules,
-            end_condition: file.end_condition,
-        };
-        scenario.validate()?;
-        Ok(scenario)
+        Self::parse(id, id, toml_src)
     }
 
     pub fn from_file(path: &Path) -> Result<Self, ScenarioError> {
+        let file = path.display().to_string();
         let src = std::fs::read_to_string(path).map_err(|source| ScenarioError::Io {
-            path: path.display().to_string(),
+            path: file.clone(),
             source,
         })?;
         let id = path
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| "scenario".to_string());
-        Self::from_toml_str(&id, &src)
+        Self::parse(&id, &file, &src)
+    }
+
+    fn parse(id: &str, file: &str, toml_src: &str) -> Result<Self, ScenarioError> {
+        let parse_err = |message: String| ScenarioError::Parse {
+            file: file.to_string(),
+            message,
+        };
+        let template: toml::Table =
+            toml::from_str(toml_src).map_err(|e| parse_err(e.to_string()))?;
+        // Validate with every range at each end, which also type-checks every field.
+        let lowest = Self::concrete(id, file, &template, &mut Pick::Min)?;
+        let highest = Self::concrete(id, file, &template, &mut Pick::Max)?;
+        lowest.validate()?;
+        highest.validate()?;
+        if highest.ball.radius >= lowest.arena.radius {
+            return Err(
+                lowest.invalid("ball.radius must be smaller than arena.radius across their ranges")
+            );
+        }
+        Ok(Scenario { template, ..lowest })
+    }
+
+    /// Builds a Scenario from `template` with every range picked by `pick`.
+    fn concrete(
+        id: &str,
+        file: &str,
+        template: &toml::Table,
+        pick: &mut Pick,
+    ) -> Result<Self, ScenarioError> {
+        let parse_err = |message: String| ScenarioError::Parse {
+            file: file.to_string(),
+            message,
+        };
+        let table = range::resolve(template, pick).map_err(parse_err)?;
+        let file_data: ScenarioFile =
+            serde_path_to_error::deserialize(toml::Value::Table(table.clone()))
+                .map_err(|e| parse_err(with_path(&e.path().to_string(), e.inner())))?;
+        let Some(end_condition) = file_data.end_condition else {
+            return Err(parse_err(
+                "missing [end_condition] (use kind = \"time_cap\" to end at the time cap)".into(),
+            ));
+        };
+        Ok(Scenario {
+            id: id.to_string(),
+            hook_title: file_data
+                .hook_title
+                .unwrap_or_else(|| file_data.name.clone()),
+            name: file_data.name,
+            time_cap: file_data.time_cap,
+            arena: file_data.arena,
+            ball: file_data.ball,
+            rules: file_data.rules,
+            end_condition: Some(end_condition),
+            template: table,
+            file: file.to_string(),
+        })
+    }
+
+    /// Resolves every range from `rng`, one draw per range in document order.
+    /// Returns the concrete Scenario and the value each range resolved to.
+    /// A Scenario without ranges is returned unchanged and draws nothing.
+    pub fn resolve(&self, rng: &mut Rng) -> (Scenario, Vec<ResolvedParam>) {
+        let mut params = Vec::new();
+        let resolved = Self::concrete(
+            &self.id,
+            &self.file,
+            &self.template,
+            &mut Pick::Seeded {
+                rng,
+                out: &mut params,
+            },
+        )
+        .expect("ranges were validated at both ends");
+        (resolved, params)
     }
 
     fn invalid(&self, message: impl Into<String>) -> ScenarioError {
         ScenarioError::Invalid {
-            id: self.id.clone(),
+            file: self.file.clone(),
             message: message.into(),
         }
     }
@@ -139,9 +216,21 @@ impl Scenario {
             return Err(self.invalid("ball.max_speed must be a finite number greater than 0"));
         }
         // Building Rules and End Conditions validates their kinds and parameters.
-        crate::rules::build_all(self).map_err(|m| self.invalid(m))?;
-        crate::sim::end_condition::build(self).map_err(|m| self.invalid(m))?;
+        for (i, spec) in self.rules.iter().enumerate() {
+            crate::rules::build(spec).map_err(|m| self.invalid(format!("rules[{i}]: {m}")))?;
+        }
+        crate::sim::end_condition::build(self)
+            .map_err(|m| self.invalid(format!("end_condition: {m}")))?;
         Ok(())
+    }
+}
+
+/// Prefixes a deserialization error with the field it happened at.
+pub(crate) fn with_path(path: &str, err: impl std::fmt::Display) -> String {
+    if path == "." || path.is_empty() {
+        err.to_string()
+    } else {
+        format!("{path}: {err}")
     }
 }
 

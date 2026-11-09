@@ -46,7 +46,9 @@ time_cap = 1.0
 radius = 460.0
 [ball]
 radius = 30.0
-speed = 3000.0
+speed = { min = 2500.0, max = 3500.0 }
+[end_condition]
+kind = "time_cap"
 "#,
     )
     .unwrap();
@@ -77,4 +79,8 @@ speed = 3000.0
     assert_eq!(meta["seed"], 5);
     assert_eq!(meta["generator_version"], env!("CARGO_PKG_VERSION"));
     assert!(meta["title"].is_string());
+    let speed = meta["parameters"]["ball.speed"]
+        .as_f64()
+        .expect("resolved ranges are recorded in meta.json");
+    assert!((2500.0..3500.0).contains(&speed), "speed {speed}");
 }

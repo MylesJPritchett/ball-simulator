@@ -14,6 +14,8 @@ pub fn substep_to_seconds(substep: u64) -> f64 {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SimRecord {
     pub seed: u64,
+    /// Each Scenario range and the value this Seed resolved it to, in draw order.
+    pub parameters: Vec<crate::scenario::ResolvedParam>,
     /// Every Boundary Hit, in the order they happened.
     pub boundary_hits: Vec<BoundaryHit>,
     /// Ball count over time: one sample at substep 0 and one whenever it changes.

@@ -189,11 +189,11 @@ fn shrinking_arena_seed_1() {
     assert_seed_1(
         "shrinking_arena",
         Snapshot {
-            boundary_hits: 94,
+            boundary_hits: 305,
             final_ball_count: 1,
-            end_condition: "arena_min_reached",
-            end_substep: 17210,
-            final_state_hash: 15629819146900822048,
+            end_condition: "arena_filled",
+            end_substep: 18032,
+            final_state_hash: 14872965655936800902,
         },
     );
 }

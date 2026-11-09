@@ -76,6 +76,20 @@ fn preview_shows_the_same_frames_as_the_renderer() {
 }
 
 #[test]
+fn preview_shows_heat_the_same_as_the_renderer() {
+    let heat = format!("{}\n[look]\nheat = true\n", minimal());
+    let path = scenario_file("same_heat", &heat);
+    let mut preview = Preview::open(path, 3);
+    for _ in 0..30 {
+        preview.advance_frame();
+    }
+    let frame = preview.frame().expect("a valid Scenario has a frame");
+
+    assert!(frame == rendered_frame(&heat, 3, 30));
+    assert!(frame != rendered_frame(&minimal(), 3, 30), "Heat is drawn");
+}
+
+#[test]
 fn unchanged_file_does_not_reload() {
     let path = scenario_file("unchanged", &minimal());
     let mut preview = Preview::open(path, 1);

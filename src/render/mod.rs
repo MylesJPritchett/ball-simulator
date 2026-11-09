@@ -8,8 +8,9 @@
 //! Draw order: background, fading trails, Boundary, hit glows, balls, the
 //! Play-out's effect (e.g. a pop), Hook Title, Counter, then the Ending's flash
 //! over everything. Trails and glows are clipped to the Arena (Boundary
-//! included).
+//! included). With Heat on, the Heat field takes the place of trails and balls.
 
+mod heat;
 pub mod layout;
 pub mod text;
 
@@ -22,6 +23,7 @@ use crate::look::palette::{Palette, Rgb};
 use crate::look::{Counter, LookSpec};
 use crate::scenario::Scenario;
 use crate::sim::{Ball, Effect, Ending, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
+use heat::Heat;
 use text::{FittedText, TextPainter};
 
 const BOUNDARY_WIDTH: f32 = 6.0;
@@ -89,6 +91,8 @@ pub struct Renderer {
     trails: Option<Pixmap>,
     /// Each ball's position on screen last frame, indexed by ball id.
     last_pos: Vec<Option<(f32, f32)>>,
+    /// Ball overlap density, drawn instead of trails and balls when on.
+    heat: Option<Heat>,
     glow: bool,
     /// Render time of the next frame, in substeps. It keeps running through
     /// the ending's hold while the simulation is frozen, so glows fade out
@@ -112,20 +116,23 @@ impl Renderer {
         let LookSpec {
             trails,
             glow,
+            heat,
             counter,
             ..
         } = scenario.look;
         let text = TextPainter::new();
         let title = text.fit(&scenario.hook_title, layout::hook_title(), TITLE_MAX_PX);
+        let scale = arena.radius / scenario.arena.radius as f32;
         Renderer {
             pixmap: Pixmap::new(layout::WIDTH, layout::HEIGHT).expect("non-zero frame size"),
-            trails: trails
+            trails: (trails && !heat)
                 .then(|| Pixmap::new(layout::WIDTH, layout::HEIGHT).expect("non-zero frame size")),
             last_pos: Vec::new(),
+            heat: heat.then(|| Heat::new(scenario)),
             glow,
             clock: 0,
             clip: None,
-            scale: arena.radius / scenario.arena.radius as f32,
+            scale,
             arena,
             text,
             title,
@@ -155,14 +162,18 @@ impl Renderer {
         self.pixmap.fill(rgb(palette.background));
         self.update_clip(sim);
 
-        if self.trails.is_some() {
+        if self.heat.is_some() {
+            self.draw_heat(sim, palette);
+        } else if self.trails.is_some() {
             self.draw_trails(sim, palette);
         }
         self.draw_boundary(sim, palette);
         if self.glow {
             self.draw_glows(sim, palette, now);
         }
-        self.draw_balls(sim, palette);
+        if self.heat.is_none() {
+            self.draw_balls(sim, palette);
+        }
         let play_out = ending.and_then(|e| Some((e.effect, e.play_out_at(now)?)));
         if let Some((Effect::Pop, t)) = play_out {
             self.draw_pops(sim, palette, t);
@@ -254,6 +265,17 @@ impl Renderer {
         );
     }
 
+    fn draw_heat(&mut self, sim: &Simulation, palette: &Palette) {
+        let heat = self.heat.as_mut().expect("heat is on");
+        heat.clear();
+        for ball in &sim.state().balls {
+            let x = self.arena.center_x + ball.pos.x as f32 * self.scale;
+            let y = self.arena.center_y + ball.pos.y as f32 * self.scale;
+            heat.add_ball(x, y, ball.radius as f32 * self.scale);
+        }
+        heat.paint(&mut self.pixmap, palette);
+    }
+
     fn boundary_radius(&self, sim: &Simulation) -> f32 {
         sim.state().arena.radius as f32 * self.scale
     }
@@ -310,9 +332,11 @@ impl Renderer {
             let strength = (1.0 - t) * (1.0 - t);
             // Balls are appended, so a ball's id is its index until one
             // vanishes; a glow whose ball is not found there takes the
-            // Boundary's colour.
+            // Boundary's colour. Heat draws no per-ball colour, so its glows
+            // take the Boundary's too.
             let colour = balls
                 .get(hit.ball_id as usize)
+                .filter(|_| self.heat.is_none())
                 .filter(|b| b.id == hit.ball_id)
                 .map(|b| palette.ball(ball_slot(b)))
                 .unwrap_or(palette.boundary);

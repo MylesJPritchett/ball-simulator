@@ -44,6 +44,7 @@ pub struct Simulation {
     end_condition: Option<Box<dyn EndCondition>>,
     rng: Rng,
     substep: u64,
+    max_speed: f64,
     time_cap_substeps: u64,
     boundary_hits: Vec<BoundaryHit>,
     ball_count: Vec<BallCountSample>,
@@ -87,6 +88,7 @@ impl Simulation {
             end_condition,
             rng,
             substep: 0,
+            max_speed: ball.max_speed,
             time_cap_substeps: (scenario.time_cap * SUBSTEP_HZ as f64).round() as u64,
             boundary_hits: Vec::new(),
             ball_count,
@@ -138,6 +140,7 @@ impl Simulation {
         for rule in &mut self.rules {
             rule.on_substep(&mut self.world, &mut ctx);
         }
+        self.world.limit_speed(self.max_speed);
 
         let completed = self.substep + 1;
         let mut hits = Vec::new();
@@ -151,6 +154,7 @@ impl Simulation {
                         ball_id: ball.id,
                         angle,
                         pitch: DEFAULT_PITCH_HZ,
+                        speed: ball.vel.length(),
                     },
                 ));
             }
@@ -162,6 +166,7 @@ impl Simulation {
             }
             self.boundary_hits.push(hit);
         }
+        self.world.limit_speed(self.max_speed);
 
         self.substep = completed;
         self.measure();
@@ -175,6 +180,7 @@ impl Simulation {
             if overshoot > self.stats.max_boundary_overshoot {
                 self.stats.max_boundary_overshoot = overshoot;
             }
+            self.stats.max_speed = self.stats.max_speed.max(ball.vel.length());
         }
         let count = self.world.balls.len();
         if self.ball_count.last().map(|s| s.count) != Some(count) {

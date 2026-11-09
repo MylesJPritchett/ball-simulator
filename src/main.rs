@@ -3,8 +3,8 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 
-use ball_simulator::pipeline;
 use ball_simulator::scenario::Scenario;
+use ball_simulator::{pipeline, preview};
 
 #[derive(Parser)]
 #[command(version, about = "Generates satisfying ball-bounce Videos")]
@@ -25,6 +25,14 @@ enum Command {
         /// Folder that Video folders are written into.
         #[arg(long, default_value = "output")]
         out: PathBuf,
+    },
+    /// Open a live preview window that reloads the Scenario file when it changes.
+    Preview {
+        /// Scenario file path, or the name of a file in `scenarios/` (without `.toml`).
+        #[arg(long)]
+        scenario: String,
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
     },
 }
 
@@ -48,6 +56,15 @@ fn main() -> ExitCode {
         } => Scenario::from_file(&resolve_scenario_path(&scenario))
             .map_err(Into::into)
             .and_then(|s| pipeline::generate(&s, seed, &out).map_err(Into::into)),
+        Command::Preview { scenario, seed } => {
+            return match preview::window::run(resolve_scenario_path(&scenario), seed) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    ExitCode::FAILURE
+                }
+            };
+        }
     };
     match result {
         Ok(dir) => {

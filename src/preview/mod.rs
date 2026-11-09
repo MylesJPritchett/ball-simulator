@@ -33,6 +33,24 @@ struct Running {
     held: u64,
 }
 
+impl Running {
+    /// A fresh run with its first frame drawn. The renderer is stateful (trails
+    /// build up over frames), so it draws every frame, exactly like the Video
+    /// pipeline, and restarts with the run.
+    fn start(scenario: Scenario, seed: u64) -> Self {
+        let sim = Simulation::new(&scenario, seed);
+        // Built from the Seed's resolved Scenario, not the template.
+        let mut renderer = Renderer::new(sim.scenario());
+        renderer.draw(&sim);
+        Running {
+            scenario,
+            sim,
+            renderer,
+            held: 0,
+        }
+    }
+}
+
 pub struct Preview {
     path: PathBuf,
     seed: u64,
@@ -93,11 +111,20 @@ impl Preview {
         if running.sim.is_ended() {
             running.held += 1;
             if running.held > Self::HOLD_FRAMES {
-                running.sim = Simulation::new(&running.scenario, self.seed);
-                running.held = 0;
+                *running = Running::start(running.scenario.clone(), self.seed);
+                return;
             }
         } else {
             running.sim.step_frame();
+        }
+        // Keep drawing during the hold (the action is frozen, trails fade), as
+        // the Video pipeline does, with the ending's flash on top, timed from
+        // the frame the End Condition fired on.
+        running.renderer.draw(&running.sim);
+        if running.sim.is_ended() {
+            running
+                .renderer
+                .flash(Ending::new(0).flash_at(running.held * SUBSTEPS_PER_FRAME));
         }
     }
 
@@ -105,14 +132,7 @@ impl Preview {
     /// draws it. `None` until a valid Scenario has been loaded.
     pub fn frame(&mut self) -> Option<&[u8]> {
         let running = self.running.as_mut()?;
-        running.renderer.draw(running.sim.world());
-        // The ending's flash, timed from the frame the End Condition fired on.
-        let flash = if running.sim.is_ended() {
-            Ending::new(0).flash_at(running.held * SUBSTEPS_PER_FRAME)
-        } else {
-            0.0
-        };
-        Some(running.renderer.flash(flash))
+        Some(running.renderer.frame())
     }
 
     /// Loads `contents` as the Scenario; returns whether it succeeded. On
@@ -122,15 +142,7 @@ impl Preview {
         self.last_contents = contents;
         match result {
             Ok(scenario) => {
-                let sim = Simulation::new(&scenario, self.seed);
-                // The Arena radius may be a range: use the Seed's resolved one.
-                let renderer = Renderer::new(sim.world().arena.radius);
-                self.running = Some(Running {
-                    sim,
-                    renderer,
-                    held: 0,
-                    scenario,
-                });
+                self.running = Some(Running::start(scenario, self.seed));
                 self.error = None;
                 true
             }

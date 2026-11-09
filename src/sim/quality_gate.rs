@@ -1,11 +1,12 @@
 //! The Quality Gate: judges a finished run from its record so dull Seeds are
 //! never rendered. Thresholds come from the Scenario's `[quality_gate]` table
-//! ([`QualityGateSpec`]); the verdict lands on `SimRecord::quality_gate`.
+//! ([`crate::scenario::QualityGateSpec`]); the verdict lands on `SimRecord::quality_gate`.
 
 use serde::Serialize;
 
+use super::end_condition::TIME_CAP;
 use super::record::SimRecord;
-use crate::scenario::QualityGateSpec;
+use crate::scenario::Scenario;
 
 /// Whether a Seed may be rendered.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -41,18 +42,20 @@ pub enum Rejection {
     TooQuiet { hits: usize, min: usize },
 }
 
-/// Judges a run. `expects_time_cap` is true when the Scenario's End Condition
-/// is the time cap itself, so reaching it is the intended payoff.
-pub fn judge(
-    gate: &QualityGateSpec,
-    expects_time_cap: bool,
-    time_cap: f64,
-    record: &SimRecord,
-) -> Verdict {
+/// Judges a run of `scenario` (with this Seed's ranges resolved) from its record.
+pub fn judge(scenario: &Scenario, record: &SimRecord) -> Verdict {
+    let gate = &scenario.quality_gate;
+    // When the time cap is the Scenario's End Condition, reaching it is the payoff.
+    let expects_time_cap = scenario
+        .end_condition
+        .as_ref()
+        .is_none_or(|spec| spec.kind == TIME_CAP);
     let seconds = record.ending.cut_time();
     let hits = record.boundary_hits.len();
-    let rejection = if !expects_time_cap && record.end.condition == super::end_condition::TIME_CAP {
-        Some(Rejection::NeverEnded { time_cap })
+    let rejection = if !expects_time_cap && record.end.condition == TIME_CAP {
+        Some(Rejection::NeverEnded {
+            time_cap: scenario.time_cap,
+        })
     } else if seconds < gate.min_duration {
         Some(Rejection::TooShort {
             seconds,

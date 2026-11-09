@@ -13,6 +13,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use crate::look::LookSpec;
 use crate::sim::rng::Rng;
 use range::Pick;
 pub use range::{ParamValue, ResolvedParam};
@@ -57,6 +58,8 @@ pub struct Scenario {
     template: toml::Table,
     /// For error messages: the file path, or the id for inline Scenarios.
     file: String,
+    /// Palette, visual toggles and Counter (`[look]`, optional).
+    pub look: LookSpec,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -129,6 +132,8 @@ struct ScenarioFile {
     end_condition: Option<RuleSpec>,
     #[serde(default)]
     quality_gate: QualityGateSpec,
+    #[serde(default)]
+    look: LookSpec,
 }
 
 impl Scenario {
@@ -202,6 +207,7 @@ impl Scenario {
             rules: file_data.rules,
             end_condition: Some(end_condition),
             quality_gate: file_data.quality_gate,
+            look: file_data.look,
             template: table,
             file: file.to_string(),
         })
@@ -247,6 +253,7 @@ impl Scenario {
                 self.invalid("ball.radius must be greater than 0 and smaller than arena.radius")
             );
         }
+        self.look.validate().map_err(|m| self.invalid(m))?;
         if !(self.ball.max_speed.is_finite() && self.ball.max_speed > 0.0) {
             return Err(self.invalid("ball.max_speed must be a finite number greater than 0"));
         }

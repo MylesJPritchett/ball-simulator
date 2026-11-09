@@ -17,8 +17,9 @@ pub use quality_gate::{Rejection, Verdict};
 pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
 pub use world::{Arena, Ball, Vec2, World};
 
+use crate::look::{palette, Palette};
 use crate::rules::{self, Rule, RuleContext};
-use crate::scenario::{QualityGateSpec, ResolvedParam, Scenario};
+use crate::scenario::{ResolvedParam, Scenario};
 use end_condition::EndCondition;
 use rng::Rng;
 
@@ -43,7 +44,10 @@ pub fn run(scenario: &Scenario, seed: u64) -> SimRecord {
 
 pub struct Simulation {
     seed: u64,
+    /// The Scenario with this Seed's ranges resolved.
+    scenario: Scenario,
     parameters: Vec<ResolvedParam>,
+    palette: &'static Palette,
     world: World,
     rules: Vec<Box<dyn Rule>>,
     end_condition: Option<Box<dyn EndCondition>>,
@@ -56,8 +60,6 @@ pub struct Simulation {
     ball_count: Vec<BallCountSample>,
     stats: SimStats,
     end: Option<EndEvent>,
-    quality_gate: QualityGateSpec,
-    time_cap: f64,
 }
 
 impl Simulation {
@@ -66,8 +68,8 @@ impl Simulation {
     pub fn new(scenario: &Scenario, seed: u64) -> Self {
         let mut rng = Rng::from_seed(seed);
         // Ranges resolve first, before any initial-state draws.
-        let (scenario, parameters) = scenario.resolve(&mut rng);
-        let scenario = &scenario;
+        let (resolved, parameters) = scenario.resolve(&mut rng);
+        let scenario = &resolved;
         let rules = rules::build_all(scenario).expect("Scenario Rules were validated");
         let end_condition =
             end_condition::build(scenario).expect("Scenario End Condition was validated");
@@ -95,6 +97,7 @@ impl Simulation {
         Simulation {
             seed,
             parameters,
+            palette: palette::for_video(scenario.look.palette.as_deref(), seed),
             world,
             rules,
             end_condition,
@@ -103,17 +106,32 @@ impl Simulation {
             max_speed: ball.max_speed,
             time_cap_substeps: (scenario.time_cap * SUBSTEP_HZ as f64).round() as u64,
             population_cap: scenario.population_cap,
+            scenario: resolved,
             boundary_hits: Vec::new(),
             ball_count,
             stats: SimStats::default(),
             end: None,
-            quality_gate: scenario.quality_gate.clone(),
-            time_cap: scenario.time_cap,
         }
     }
 
     pub fn world(&self) -> &World {
         &self.world
+    }
+
+    /// The Scenario as this Seed resolved it: per-Seed values (Arena radius,
+    /// ball size...) come from here, not from the template's fields.
+    pub fn scenario(&self) -> &Scenario {
+        &self.scenario
+    }
+
+    /// The Video's palette.
+    pub fn palette(&self) -> &'static Palette {
+        self.palette
+    }
+
+    /// Every Boundary Hit so far, in order.
+    pub fn boundary_hits(&self) -> &[BoundaryHit] {
+        &self.boundary_hits
     }
 
     /// Substeps completed so far.
@@ -234,6 +252,7 @@ impl Simulation {
         let mut record = SimRecord {
             seed: self.seed,
             parameters: self.parameters,
+            palette: self.palette.name.to_string(),
             final_state_hash: hash_world(&self.world, self.substep),
             final_arena_radius: self.world.arena.radius,
             boundary_hits: self.boundary_hits,
@@ -244,12 +263,7 @@ impl Simulation {
             final_balls: self.world.balls,
             quality_gate: Verdict::Accepted,
         };
-        record.quality_gate = quality_gate::judge(
-            &self.quality_gate,
-            self.end_condition.is_none(),
-            self.time_cap,
-            &record,
-        );
+        record.quality_gate = quality_gate::judge(&self.scenario, &record);
         record
     }
 }

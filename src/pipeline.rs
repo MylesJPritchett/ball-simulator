@@ -163,13 +163,14 @@ fn render(
     let mp4 = dir.join("video.mp4");
     let mut encoder = VideoEncoder::start(&mp4, &wav, layout::WIDTH, layout::HEIGHT, FPS)?;
     let mut sim = Simulation::new(scenario, seed);
-    // The Arena radius may be a range: use the Seed's resolved one.
-    let mut renderer = Renderer::new(sim.world().arena.radius);
+    // Built from the Seed's resolved Scenario (ranges such as the Arena radius
+    // resolved), not the template.
+    let mut renderer = Renderer::new(sim.scenario());
     // Frame k shows the state after k * SUBSTEPS_PER_FRAME substeps; once the
-    // run has ended `step_frame` does nothing, so the action freezes and the
-    // flash plays over the frozen frame.
+    // run has ended `step_frame` does nothing, so the action freezes, the
+    // trails keep fading and the flash plays over the frozen frame.
     for frame in 0..frames {
-        renderer.draw(sim.world());
+        renderer.draw(&sim);
         encoder.write_frame(renderer.flash(ending.flash_at(frame * SUBSTEPS_PER_FRAME)))?;
         sim.step_frame();
     }

@@ -37,6 +37,10 @@ pub struct BoundaryHit {
     pub angle: f64,
     /// Pitch assigned to this hit's note, in Hz.
     pub pitch: f64,
+    /// The ball's speed at impact (before on-hit Rules), in units per second.
+    pub speed: f64,
+    /// The ball's palette colour index after on-hit Rules ran.
+    pub colour: u32,
 }
 
 impl BoundaryHit {
@@ -71,4 +75,6 @@ pub struct SimStats {
     /// Largest distance any ball's edge was outside the Boundary at the end of a
     /// substep (0 if never).
     pub max_boundary_overshoot: f64,
+    /// Highest ball speed at the end of any substep, in units per second.
+    pub max_speed: f64,
 }

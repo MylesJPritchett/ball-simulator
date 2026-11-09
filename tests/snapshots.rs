@@ -38,6 +38,17 @@ fn minimal_seed_1() {
 }
 
 #[test]
+fn faster_every_bounce_seed_1() {
+    let record = sim::run(&shipped("faster_every_bounce"), 1);
+
+    assert_eq!(record.end.condition, "time_cap");
+    assert_eq!(record.end.substep, 9600);
+    assert!(record.stats.max_speed <= 4000.0 + 1e-9);
+    assert_eq!(record.boundary_hits.len(), 71);
+    assert_eq!(record.final_state_hash, 920117634866952227);
+}
+
+#[test]
 fn shrinking_arena_seed_1() {
     let record = sim::run(&shipped("shrinking_arena"), 1);
 

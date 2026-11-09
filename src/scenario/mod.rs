@@ -8,6 +8,8 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use crate::look::LookSpec;
+
 /// Errors from loading or validating a Scenario.
 #[derive(Debug, thiserror::Error)]
 pub enum ScenarioError {
@@ -36,6 +38,8 @@ pub struct Scenario {
     pub ball: BallSpec,
     pub rules: Vec<RuleSpec>,
     pub end_condition: Option<RuleSpec>,
+    /// Palette, visual toggles and Counter (`[look]`, optional).
+    pub look: LookSpec,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -72,6 +76,8 @@ struct ScenarioFile {
     #[serde(default)]
     rules: Vec<RuleSpec>,
     end_condition: Option<RuleSpec>,
+    #[serde(default)]
+    look: LookSpec,
 }
 
 impl Scenario {
@@ -89,6 +95,7 @@ impl Scenario {
             ball: file.ball,
             rules: file.rules,
             end_condition: file.end_condition,
+            look: file.look,
         };
         scenario.validate()?;
         Ok(scenario)
@@ -125,6 +132,7 @@ impl Scenario {
                 self.invalid("ball.radius must be greater than 0 and smaller than arena.radius")
             );
         }
+        self.look.validate().map_err(|m| self.invalid(m))?;
         // Building Rules and End Conditions validates their kinds and parameters.
         crate::rules::build_all(self).map_err(|m| self.invalid(m))?;
         crate::sim::end_condition::build(self).map_err(|m| self.invalid(m))?;

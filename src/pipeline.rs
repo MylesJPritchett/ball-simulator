@@ -51,9 +51,9 @@ pub fn generate(scenario: &Scenario, seed: u64, out_root: &Path) -> Result<PathB
     let mp4 = dir.join("video.mp4");
     let mut encoder = VideoEncoder::start(&mp4, &wav, layout::WIDTH, layout::HEIGHT, FPS)?;
     let mut sim = Simulation::new(scenario, seed);
-    let mut renderer = Renderer::new(scenario.arena.radius);
+    let mut renderer = Renderer::new(scenario);
     for _ in 0..frames {
-        encoder.write_frame(renderer.draw(sim.world()))?;
+        encoder.write_frame(renderer.draw(&sim))?;
         sim.step_frame();
     }
     encoder.finish()?;

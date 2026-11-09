@@ -14,6 +14,8 @@ pub fn substep_to_seconds(substep: u64) -> f64 {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SimRecord {
     pub seed: u64,
+    /// Name of the Video's palette (pinned by the Scenario or chosen by the Seed).
+    pub palette: String,
     /// Every Boundary Hit, in the order they happened.
     pub boundary_hits: Vec<BoundaryHit>,
     /// Ball count over time: one sample at substep 0 and one whenever it changes.

@@ -54,6 +54,8 @@ pub struct Scenario {
     pub end_condition: Option<RuleSpec>,
     /// Thresholds a Seed must meet to be rendered.
     pub quality_gate: QualityGateSpec,
+    /// Pinned instrument / scale / pitch mode (`[sound]`).
+    pub sound: crate::audio::music::SoundSpec,
     /// The file as written, ranges included.
     template: toml::Table,
     /// For error messages: the file path, or the id for inline Scenarios.
@@ -133,6 +135,8 @@ struct ScenarioFile {
     #[serde(default)]
     quality_gate: QualityGateSpec,
     #[serde(default)]
+    sound: crate::audio::music::SoundSpec,
+    #[serde(default)]
     look: LookSpec,
 }
 
@@ -207,6 +211,7 @@ impl Scenario {
             rules: file_data.rules,
             end_condition: Some(end_condition),
             quality_gate: file_data.quality_gate,
+            sound: file_data.sound,
             look: file_data.look,
             template: table,
             file: file.to_string(),

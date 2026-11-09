@@ -16,6 +16,8 @@ pub struct SimRecord {
     pub seed: u64,
     /// Each Scenario range and the value this Seed resolved it to, in draw order.
     pub parameters: Vec<crate::scenario::ResolvedParam>,
+    /// Instrument, scale and pitch mode for this Video.
+    pub sound: crate::audio::music::Sound,
     /// Name of the Video's palette (pinned by the Scenario or chosen by the Seed).
     pub palette: String,
     /// Every Boundary Hit, in the order they happened.

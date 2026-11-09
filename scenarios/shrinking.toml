@@ -35,3 +35,8 @@ pitch_mode = "ball_size"
 min_duration = 30.0
 max_duration = 45.0
 min_boundary_hits = 55
+
+[meta]
+title = "It shrinks every bounce - how small can it get?"
+description = "A ball {ball.radius} units wide shrinks by {rules[0].amount} on every Boundary Hit, and its note climbs as it goes. {boundary_hits} bounces."
+hashtags = ["shrinking", "tiny"]

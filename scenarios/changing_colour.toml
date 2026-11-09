@@ -41,3 +41,8 @@ trails = true
 min_duration = 28.0
 max_duration = 45.0
 min_boundary_hits = 40
+
+[meta]
+title = "Every bounce changes its colour - {boundary_hits} colours later"
+description = "One ball falls and takes the next {palette} colour on every Boundary Hit, a little faster each time."
+hashtags = ["colours", "gravity", "rainbow"]

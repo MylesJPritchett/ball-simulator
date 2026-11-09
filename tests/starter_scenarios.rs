@@ -44,6 +44,18 @@ fn every_shipped_scenario_has_its_own_hook_title() {
 }
 
 #[test]
+fn every_shipped_scenario_has_metadata_templates() {
+    for (path, scenario) in shipped() {
+        let meta = &scenario.meta;
+        assert!(
+            meta.title.is_some() && meta.description.is_some() && !meta.hashtags.is_empty(),
+            "{} needs a [meta] title, description and hashtags",
+            path.display()
+        );
+    }
+}
+
+#[test]
 fn every_shipped_scenario_aims_at_25_to_55_second_videos() {
     for (path, scenario) in shipped() {
         let gate = &scenario.quality_gate;

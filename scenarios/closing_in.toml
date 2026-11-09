@@ -42,3 +42,8 @@ palette = "ember"
 min_duration = 25.0
 max_duration = 55.0
 min_boundary_hits = 60
+
+[meta]
+title = "It grows as the Arena shrinks - who wins?"
+description = "The ball grows {rules[2].amount} units on every Boundary Hit while the Boundary closes in at {rules[1].rate} units a second. It fills the Arena after {boundary_hits} bounces."
+hashtags = ["growing", "shrinking", "tension"]

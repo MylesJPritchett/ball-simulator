@@ -32,3 +32,8 @@ counter = "speed"
 min_duration = 25.0
 max_duration = 45.0
 min_boundary_hits = 50
+
+[meta]
+title = "It gets {rules[0].percent}% faster every bounce"
+description = "Every Boundary Hit speeds the ball up by {rules[0].percent}% and changes its colour. {boundary_hits} bounces in {duration} seconds."
+hashtags = ["speed", "faster", "acceleration"]

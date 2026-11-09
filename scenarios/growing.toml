@@ -34,3 +34,8 @@ pitch_mode = "ball_size"
 min_duration = 25.0
 max_duration = 55.0
 min_boundary_hits = 40
+
+[meta]
+title = "It grows {rules[0].amount} units every bounce - can it fill the Arena?"
+description = "One ball grows on every Boundary Hit until it fills the Arena: {boundary_hits} bounces in {duration} seconds."
+hashtags = ["growing", "fill"]

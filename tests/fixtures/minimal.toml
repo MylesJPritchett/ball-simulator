@@ -21,3 +21,8 @@ kind = "time_cap"
 min_duration = 10.0
 max_duration = 12.0
 min_boundary_hits = 8
+
+[meta]
+title = "{hook_title}"
+description = "One ball, a circle, and a note on every bounce: {boundary_hits} of them."
+hashtags = ["bounce", "relaxing"]

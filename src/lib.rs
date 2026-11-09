@@ -6,6 +6,7 @@
 //! [`pipeline`] wires these together for one Video.
 
 pub mod audio;
+pub mod batch;
 pub mod encode;
 pub mod look;
 pub mod meta;

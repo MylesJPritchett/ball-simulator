@@ -37,3 +37,8 @@ counter = "ball_count"
 min_duration = 25.0
 max_duration = 50.0
 min_boundary_hits = 800
+
+[meta]
+title = "Gravity is on and every bounce splits it - {population_cap} balls?"
+description = "One falling ball splits in two on every Boundary Hit until there are {balls}. {boundary_hits} bounces in {duration} seconds."
+hashtags = ["gravity", "split", "exponential"]

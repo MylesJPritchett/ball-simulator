@@ -51,6 +51,8 @@ pub struct Scenario {
     pub rules: Vec<RuleSpec>,
     /// Required in files, so always `Some` once parsed.
     pub end_condition: Option<RuleSpec>,
+    /// Pinned instrument / scale / pitch mode (`[sound]`).
+    pub sound: crate::audio::music::SoundSpec,
     /// The file as written, ranges included.
     template: toml::Table,
     /// For error messages: the file path, or the id for inline Scenarios.
@@ -103,6 +105,8 @@ struct ScenarioFile {
     #[serde(default)]
     rules: Vec<RuleSpec>,
     end_condition: Option<RuleSpec>,
+    #[serde(default)]
+    sound: crate::audio::music::SoundSpec,
 }
 
 impl Scenario {
@@ -175,6 +179,7 @@ impl Scenario {
             ball: file_data.ball,
             rules: file_data.rules,
             end_condition: Some(end_condition),
+            sound: file_data.sound,
             template: table,
             file: file.to_string(),
         })

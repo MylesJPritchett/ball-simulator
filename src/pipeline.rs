@@ -42,10 +42,9 @@ pub fn generate(scenario: &Scenario, seed: u64, out_root: &Path) -> Result<PathB
     // The Video runs through the ending's hold, not just to the End Condition.
     let ending = record.ending;
     let frames = ending.frames();
-    let duration = ending.duration();
 
     let wav = dir.join("audio.wav");
-    let samples = audio::synthesize(&record, duration);
+    let samples = audio::synthesize(&record);
     audio::write_wav(&wav, &samples, audio::SAMPLE_RATE).map_err(io_err(&wav))?;
 
     // Replay the same deterministic run for frames.

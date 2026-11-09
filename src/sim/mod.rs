@@ -122,7 +122,7 @@ impl Simulation {
     }
 
     /// The Scenario as this Seed resolved it: per-Seed values (Arena radius,
-    /// ball size...) come from here, not from the template's fields.
+    /// ball size...) come from here, not from the parsed Scenario's fields.
     pub fn scenario(&self) -> &Scenario {
         &self.scenario
     }

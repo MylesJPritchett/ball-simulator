@@ -172,7 +172,7 @@ fn render(
     let mut encoder = VideoEncoder::start(&mp4, &wav, layout::WIDTH, layout::HEIGHT, FPS)?;
     let mut sim = Simulation::new(scenario, seed);
     // Built from the Seed's resolved Scenario (ranges such as the Arena radius
-    // resolved), not the template.
+    // resolved), not the parsed file's lower bounds.
     let mut renderer = Renderer::new(sim.scenario());
     // Frame k shows the state after k * SUBSTEPS_PER_FRAME substeps; once the
     // run has ended `step_frame` does nothing, so the action freezes, the

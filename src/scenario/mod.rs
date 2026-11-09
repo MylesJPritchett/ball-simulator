@@ -38,34 +38,49 @@ pub enum ScenarioError {
 /// A parsed, validated Scenario. If the file has ranges, the fields below
 /// hold every range at its lower bound; use [`Scenario::resolve`] (which
 /// [`crate::sim::run`] does) for a Seed's concrete values.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// The file's keys deserialize straight into this struct (after ranges are
+/// picked): a new Scenario key is one field here plus its validation.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Scenario {
     /// Identifier used in output folder names; the file stem for Scenario files.
+    #[serde(skip)]
     pub id: String,
     pub name: String,
     /// Shown above the Arena and used as the Video title. Defaults to `name`.
+    #[serde(default)]
     pub hook_title: String,
     /// Hard time cap in seconds; always an End Condition.
     pub time_cap: f64,
     /// Maximum ball count; the simulation never exceeds it.
+    #[serde(default = "default_population_cap")]
     pub population_cap: usize,
     pub arena: ArenaSpec,
     pub ball: BallSpec,
+    #[serde(default)]
     pub rules: Vec<RuleSpec>,
     /// The Scenario's End Condition (`kind = "time_cap"` for the cap alone).
     pub end_condition: RuleSpec,
     /// Thresholds a Seed must meet to be rendered.
+    #[serde(default)]
     pub quality_gate: QualityGateSpec,
     /// Pinned instrument / scale / pitch mode (`[sound]`).
+    #[serde(default)]
     pub sound: crate::audio::music::SoundSpec,
-    /// The file as written, ranges included.
-    template: toml::Table,
-    /// For error messages: the file path, or the id for inline Scenarios.
-    file: String,
     /// Palette, visual toggles and Counter (`[look]`, optional).
+    #[serde(default)]
     pub look: LookSpec,
     /// Title, description and hashtag templates (`[meta]`, optional).
+    #[serde(default)]
     pub meta: MetaSpec,
+    /// The file's TOML: as written (ranges included) on a parsed Scenario,
+    /// with every range resolved on a [`Scenario::resolve`]d one.
+    #[serde(skip)]
+    raw: toml::Table,
+    /// For error messages: the file path, or the id for inline Scenarios.
+    #[serde(skip)]
+    file: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -123,29 +138,6 @@ pub struct RuleSpec {
     pub params: toml::Table,
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ScenarioFile {
-    name: String,
-    hook_title: Option<String>,
-    time_cap: f64,
-    #[serde(default = "default_population_cap")]
-    population_cap: usize,
-    arena: ArenaSpec,
-    ball: BallSpec,
-    #[serde(default)]
-    rules: Vec<RuleSpec>,
-    end_condition: Option<RuleSpec>,
-    #[serde(default)]
-    quality_gate: QualityGateSpec,
-    #[serde(default)]
-    sound: crate::audio::music::SoundSpec,
-    #[serde(default)]
-    look: LookSpec,
-    #[serde(default)]
-    meta: MetaSpec,
-}
-
 impl Scenario {
     pub fn from_toml_str(id: &str, toml_src: &str) -> Result<Self, ScenarioError> {
         Self::parse(id, id, toml_src)
@@ -165,15 +157,11 @@ impl Scenario {
     }
 
     fn parse(id: &str, file: &str, toml_src: &str) -> Result<Self, ScenarioError> {
-        let parse_err = |message: String| ScenarioError::Parse {
-            file: file.to_string(),
-            message,
-        };
-        let template: toml::Table =
-            toml::from_str(toml_src).map_err(|e| parse_err(e.to_string()))?;
+        let raw: toml::Table =
+            toml::from_str(toml_src).map_err(|e| parse_error(file, e.to_string()))?;
         // Validate with every range at each end, which also type-checks every field.
-        let lowest = Self::concrete(id, file, &template, &mut Pick::Min)?;
-        let highest = Self::concrete(id, file, &template, &mut Pick::Max)?;
+        let lowest = Self::concrete(id, file, &raw, &mut Pick::Min)?;
+        let highest = Self::concrete(id, file, &raw, &mut Pick::Max)?;
         lowest.validate()?;
         highest.validate()?;
         if highest.ball.radius >= lowest.arena.radius {
@@ -181,48 +169,39 @@ impl Scenario {
                 lowest.invalid("ball.radius must be smaller than arena.radius across their ranges")
             );
         }
-        Ok(Scenario { template, ..lowest })
+        Ok(Scenario { raw, ..lowest })
     }
 
-    /// Builds a Scenario from `template` with every range picked by `pick`.
+    /// Builds a Scenario from `raw` with every range picked by `pick`.
     fn concrete(
         id: &str,
         file: &str,
-        template: &toml::Table,
+        raw: &toml::Table,
         pick: &mut Pick,
     ) -> Result<Self, ScenarioError> {
-        let parse_err = |message: String| ScenarioError::Parse {
-            file: file.to_string(),
-            message,
-        };
-        let table = range::resolve(template, pick).map_err(parse_err)?;
-        let file_data: ScenarioFile =
-            serde_path_to_error::deserialize(toml::Value::Table(table.clone()))
-                .map_err(|e| parse_err(with_path(&e.path().to_string(), e.inner())))?;
-        let Some(end_condition) = file_data.end_condition else {
-            return Err(parse_err(
-                "missing [end_condition] (use kind = \"time_cap\" to end at the time cap)".into(),
-            ));
-        };
-        Ok(Scenario {
-            id: id.to_string(),
-            hook_title: file_data
-                .hook_title
-                .unwrap_or_else(|| file_data.name.clone()),
-            name: file_data.name,
-            time_cap: file_data.time_cap,
-            population_cap: file_data.population_cap,
-            arena: file_data.arena,
-            ball: file_data.ball,
-            rules: file_data.rules,
-            end_condition,
-            quality_gate: file_data.quality_gate,
-            sound: file_data.sound,
-            look: file_data.look,
-            meta: file_data.meta,
-            template: table,
-            file: file.to_string(),
-        })
+        let table = range::resolve(raw, pick).map_err(|m| parse_error(file, m))?;
+        let mut scenario: Scenario =
+            serde_path_to_error::deserialize(toml::Value::Table(table.clone())).map_err(|e| {
+                // Missing fields are reported last, after every other problem.
+                let message = if e
+                    .inner()
+                    .to_string()
+                    .contains("missing field `end_condition`")
+                {
+                    "missing [end_condition] (use kind = \"time_cap\" to end at the time cap)"
+                        .to_string()
+                } else {
+                    with_path(&e.path().to_string(), e.inner())
+                };
+                parse_error(file, message)
+            })?;
+        if scenario.hook_title.is_empty() {
+            scenario.hook_title = scenario.name.clone();
+        }
+        scenario.id = id.to_string();
+        scenario.file = file.to_string();
+        scenario.raw = table;
+        Ok(scenario)
     }
 
     /// Resolves every range from `rng`, one draw per range in document order.
@@ -233,7 +212,7 @@ impl Scenario {
         let resolved = Self::concrete(
             &self.id,
             &self.file,
-            &self.template,
+            &self.raw,
             &mut Pick::Seeded {
                 rng,
                 out: &mut params,
@@ -248,7 +227,7 @@ impl Scenario {
     /// the Seed's values. Metadata templates are filled in from these.
     pub fn values(&self) -> BTreeMap<String, String> {
         let mut out = BTreeMap::new();
-        flatten("", &toml::Value::Table(self.template.clone()), &mut out);
+        flatten("", &toml::Value::Table(self.raw.clone()), &mut out);
         out.retain(|k, _| !k.starts_with("meta."));
         out.insert("hook_title".into(), self.hook_title.clone());
         out
@@ -328,6 +307,13 @@ fn flatten(path: &str, value: &toml::Value, out: &mut BTreeMap<String, String>) 
         toml::Value::Datetime(d) => d.to_string(),
     };
     out.insert(path.to_string(), text);
+}
+
+fn parse_error(file: &str, message: impl Into<String>) -> ScenarioError {
+    ScenarioError::Parse {
+        file: file.to_string(),
+        message: message.into(),
+    }
 }
 
 /// Prefixes a deserialization error with the field it happened at.

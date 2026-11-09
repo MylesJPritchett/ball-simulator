@@ -18,6 +18,8 @@ pub struct SimRecord {
     pub parameters: Vec<crate::scenario::ResolvedParam>,
     /// Instrument, scale and pitch mode for this Video.
     pub sound: crate::audio::music::Sound,
+    /// Name of the Video's palette (pinned by the Scenario or chosen by the Seed).
+    pub palette: String,
     /// Every Boundary Hit, in the order they happened.
     pub boundary_hits: Vec<BoundaryHit>,
     /// Ball count over time: one sample at substep 0 and one whenever it changes.

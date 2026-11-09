@@ -6,6 +6,7 @@ description = "Generates satisfying ball-bounce Videos from Scenarios and Seeds"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
+fontdue = "0.9"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_path_to_error = "0.1"

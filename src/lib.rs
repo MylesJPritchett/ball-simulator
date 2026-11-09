@@ -7,6 +7,7 @@
 
 pub mod audio;
 pub mod encode;
+pub mod look;
 pub mod meta;
 pub mod pipeline;
 pub mod preview;

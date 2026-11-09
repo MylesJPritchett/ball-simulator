@@ -16,6 +16,8 @@ pub struct SimRecord {
     pub seed: u64,
     /// Each Scenario range and the value this Seed resolved it to, in draw order.
     pub parameters: Vec<crate::scenario::ResolvedParam>,
+    /// Name of the Video's palette (pinned by the Scenario or chosen by the Seed).
+    pub palette: String,
     /// Every Boundary Hit, in the order they happened.
     pub boundary_hits: Vec<BoundaryHit>,
     /// Ball count over time: one sample at substep 0 and one whenever it changes.

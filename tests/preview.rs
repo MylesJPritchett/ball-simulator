@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use ball_simulator::preview::{Preview, Reload};
 use ball_simulator::render::{layout, Renderer};
-use ball_simulator::sim::Simulation;
+use ball_simulator::sim::{Simulation, SUBSTEPS_PER_FRAME};
 
 /// `support::MINIMAL` plus an End Condition: a complete Scenario file.
 fn minimal() -> String {
@@ -25,15 +25,35 @@ fn scenario_file(name: &str, contents: &str) -> PathBuf {
     path
 }
 
-/// The frame the Video renderer produces after `frames` frames.
+/// The frame the Video renderer produces after `frames` frames, drawing every
+/// frame on the way as the pipeline does (trails build up over frames).
 fn rendered_frame(toml: &str, seed: u64, frames: u64) -> Vec<u8> {
     let scenario = support::scenario(toml);
     let mut sim = Simulation::new(&scenario, seed);
+    let mut renderer = Renderer::new(sim.scenario());
+    renderer.draw(&sim);
     for _ in 0..frames {
         sim.step_frame();
+        renderer.draw(&sim);
     }
-    let initial_radius = Simulation::new(&scenario, seed).world().arena.radius;
-    Renderer::new(initial_radius).draw(sim.world()).to_vec()
+    renderer.frame().to_vec()
+}
+
+/// Frame `frame` of the Video as the pipeline encodes it: drawn every frame,
+/// with the ending's flash on top and the action frozen after the end.
+fn video_frame(toml: &str, seed: u64, frame: u64) -> Vec<u8> {
+    let scenario = support::scenario(toml);
+    let ending = ball_simulator::sim::run(&scenario, seed).ending;
+    let mut sim = Simulation::new(&scenario, seed);
+    let mut renderer = Renderer::new(sim.scenario());
+    for k in 0..=frame {
+        if k > 0 {
+            sim.step_frame();
+        }
+        renderer.draw(&sim);
+        renderer.flash(ending.flash_at(k * SUBSTEPS_PER_FRAME));
+    }
+    renderer.frame().to_vec()
 }
 
 #[test]
@@ -131,11 +151,22 @@ fn preview_loops_after_the_end_condition_and_a_hold() {
     let short = minimal().replace("time_cap = 5.0", "time_cap = 0.5");
     let path = scenario_file("loops", &short);
     let mut preview = Preview::open(path, 2);
-    // 30 frames of action, then the final frame is held before restarting.
-    for _ in 0..30 + Preview::HOLD_FRAMES {
+    // 30 frames of action: the End Condition fires on frame 30 and the
+    // ending's flash starts on it, exactly as in the Video.
+    for _ in 0..30 {
         preview.advance_frame();
     }
-    assert!(preview.frame().unwrap() == rendered_frame(&short, 2, 30));
+    let ending_frame = preview.frame().unwrap().to_vec();
+    assert!(ending_frame == video_frame(&short, 2, 30));
+    assert!(
+        ending_frame != rendered_frame(&short, 2, 30),
+        "flash is drawn"
+    );
+    // Then the frozen frame is held (flash faded, trails fading) before restarting.
+    for _ in 0..Preview::HOLD_FRAMES {
+        preview.advance_frame();
+    }
+    assert!(preview.frame().unwrap() == video_frame(&short, 2, 30 + Preview::HOLD_FRAMES));
     preview.advance_frame();
     assert!(preview.frame().unwrap() == rendered_frame(&short, 2, 0));
 }

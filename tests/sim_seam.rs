@@ -43,7 +43,10 @@ fn ball_resting_on_the_boundary_stops_registering_boundary_hits() {
             .iter()
             .filter(|h| h.substep > last_5_s)
             .count();
-        assert!(late_hits <= 5, "seed {seed}: {late_hits} hits in the last 5 s");
+        assert!(
+            late_hits <= 5,
+            "seed {seed}: {late_hits} hits in the last 5 s"
+        );
         assert!(
             record.stats.max_boundary_overshoot <= 1e-9,
             "seed {seed}: overshoot {}",

@@ -6,20 +6,20 @@
 //! identical frames.
 //!
 //! Draw order: background, fading trails, Boundary, hit glows, balls, Hook
-//! Title, Counter.
+//! Title, Counter. Trails and glows are clipped to the Arena (Boundary included).
 
 pub mod layout;
 pub mod text;
 
 use tiny_skia::{
-    Color, FillRule, GradientStop, LineCap, Paint, PathBuilder, Pixmap, PixmapPaint, Point,
+    Color, FillRule, GradientStop, LineCap, Mask, Paint, PathBuilder, Pixmap, PixmapPaint, Point,
     RadialGradient, Rect, Shader, SpreadMode, Stroke, Transform,
 };
 
 use crate::look::palette::{Palette, Rgb};
 use crate::look::{Counter, LookSpec};
 use crate::scenario::Scenario;
-use crate::sim::{Ball, Simulation, SUBSTEP_HZ};
+use crate::sim::{Ball, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
 use text::{FittedText, TextPainter};
 
 const BOUNDARY_WIDTH: f32 = 6.0;
@@ -39,6 +39,12 @@ const GLOW_SUBSTEPS: u64 = SUBSTEP_HZ * 2 / 5;
 const GLOW_RADIUS: f32 = 100.0;
 /// Most recent glows drawn per frame, to bound cost with many balls.
 const MAX_GLOWS: usize = 96;
+/// A glow this close (in pixels) to a newer one is merged into it, so hits
+/// landing on the same spot don't stack into a solid blob.
+const GLOW_MERGE_PX: f32 = GLOW_RADIUS;
+/// Hits looked at per frame when choosing glows (bounds the merge cost when
+/// thousands of balls hit at once).
+const MAX_GLOW_CANDIDATES: usize = MAX_GLOWS * 16;
 
 const TITLE_MAX_PX: f32 = 76.0;
 const COUNTER_NUMBER_PX: f32 = 132.0;
@@ -77,6 +83,12 @@ pub struct Renderer {
     /// Each ball's position on screen last frame, indexed by ball id.
     last_pos: Vec<Option<(f32, f32)>>,
     glow: bool,
+    /// Render time of the next frame, in substeps. It keeps running through
+    /// the ending's hold while the simulation is frozen, so glows fade out.
+    clock: u64,
+    /// Clip for trails and glows: the Arena inside the Boundary's outer
+    /// edge, with the Boundary radius (px) it was built for.
+    clip: Option<(f32, Mask)>,
     arena: layout::ArenaLayout,
     /// Pixels per simulation unit, fixed from the initial Arena radius so a
     /// changing Arena changes size on screen.
@@ -103,6 +115,8 @@ impl Renderer {
                 .then(|| Pixmap::new(layout::WIDTH, layout::HEIGHT).expect("non-zero frame size")),
             last_pos: Vec::new(),
             glow,
+            clock: 0,
+            clip: None,
             scale: arena.radius / scenario.arena.radius as f32,
             arena,
             text,
@@ -126,14 +140,17 @@ impl Renderer {
     /// pixel is opaque and premultiplied equals straight alpha.
     pub fn draw(&mut self, sim: &Simulation) -> &[u8] {
         let palette = sim.palette();
+        let now = self.clock.max(sim.substep());
+        self.clock = now + SUBSTEPS_PER_FRAME;
         self.pixmap.fill(rgb(palette.background));
+        self.update_clip(sim);
 
         if self.trails.is_some() {
             self.draw_trails(sim, palette);
         }
         self.draw_boundary(sim, palette);
         if self.glow {
-            self.draw_glows(sim, palette);
+            self.draw_glows(sim, palette, now);
         }
         self.draw_balls(sim, palette);
         self.draw_text(sim, palette);
@@ -144,6 +161,21 @@ impl Renderer {
     /// The most recently drawn frame as RGBA bytes (blank before the first draw).
     pub fn frame(&self) -> &[u8] {
         self.pixmap.data()
+    }
+
+    /// Rebuilds the trail/glow clip when the Boundary has moved.
+    fn update_clip(&mut self, sim: &Simulation) {
+        let outer = self.boundary_radius(sim) + BOUNDARY_WIDTH;
+        if self.clip.as_ref().is_some_and(|(r, _)| *r == outer) {
+            return;
+        }
+        let mut mask = Mask::new(layout::WIDTH, layout::HEIGHT).expect("non-zero frame size");
+        if let Some(circle) =
+            PathBuilder::from_circle(self.arena.center_x, self.arena.center_y, outer)
+        {
+            mask.fill_path(&circle, FillRule::Winding, true, Transform::identity());
+        }
+        self.clip = Some((outer, mask));
     }
 
     fn draw_trails(&mut self, sim: &Simulation, palette: &Palette) {
@@ -194,13 +226,14 @@ impl Renderer {
             }
         }
 
+        let clip = self.clip.as_ref().map(|(_, mask)| mask);
         self.pixmap.draw_pixmap(
             0,
             0,
             layer.as_ref(),
             &PixmapPaint::default(),
             Transform::identity(),
-            None,
+            clip,
         );
     }
 
@@ -227,18 +260,35 @@ impl Renderer {
     }
 
     /// A soft glow on the Boundary where each recent Boundary Hit landed, in
-    /// the hitting ball's colour, fading out over [`GLOW_SUBSTEPS`].
-    fn draw_glows(&mut self, sim: &Simulation, palette: &Palette) {
-        let now = sim.substep();
+    /// the hitting ball's colour, fading out over [`GLOW_SUBSTEPS`] of render
+    /// time (`now`). Hits close to a newer one share its glow, and glows are
+    /// clipped to the Arena.
+    fn draw_glows(&mut self, sim: &Simulation, palette: &Palette, now: u64) {
         let boundary = self.boundary_radius(sim) + BOUNDARY_WIDTH / 2.0;
         let balls = &sim.world().balls;
-        let recent = sim
+        let mut glows: Vec<(&crate::sim::BoundaryHit, f32, f32)> = Vec::new();
+        for hit in sim
             .boundary_hits()
             .iter()
             .rev()
             .take_while(|h| now.saturating_sub(h.substep) < GLOW_SUBSTEPS)
-            .take(MAX_GLOWS);
-        for hit in recent {
+            .take(MAX_GLOW_CANDIDATES)
+        {
+            let (sin, cos) = (hit.angle as f32).sin_cos();
+            let x = self.arena.center_x + cos * boundary;
+            let y = self.arena.center_y + sin * boundary;
+            let near_newer = glows
+                .iter()
+                .any(|&(_, gx, gy)| (gx - x).hypot(gy - y) < GLOW_MERGE_PX);
+            if !near_newer {
+                glows.push((hit, x, y));
+                if glows.len() == MAX_GLOWS {
+                    break;
+                }
+            }
+        }
+        let clip = self.clip.as_ref().map(|(_, mask)| mask);
+        for (hit, x, y) in glows {
             let t = (now - hit.substep) as f32 / GLOW_SUBSTEPS as f32;
             let strength = (1.0 - t) * (1.0 - t);
             // Balls are only ever appended, so a ball's id is its index.
@@ -247,9 +297,6 @@ impl Renderer {
                 .filter(|b| b.id == hit.ball_id)
                 .map(|b| palette.ball(ball_slot(b)))
                 .unwrap_or(palette.boundary);
-            let (sin, cos) = (hit.angle as f32).sin_cos();
-            let x = self.arena.center_x + cos * boundary;
-            let y = self.arena.center_y + sin * boundary;
             let radius = GLOW_RADIUS * (1.0 + 0.6 * t);
             let alpha = (strength * 255.0) as u8;
             let core = mix(colour, [255, 255, 255], 0.35);
@@ -279,7 +326,7 @@ impl Renderer {
                     &paint,
                     FillRule::Winding,
                     Transform::identity(),
-                    None,
+                    clip,
                 );
             }
         }

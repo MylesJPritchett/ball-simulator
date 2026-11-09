@@ -40,7 +40,11 @@ fn arena_min_reached_ends_when_the_arena_stops_shrinking() {
     let record = run(&toml, 1);
 
     assert_eq!(record.end.condition, "arena_min_reached");
-    assert!((record.end.time() - 2.6).abs() <= 1.0 / 240.0, "{}", record.end.time());
+    assert!(
+        (record.end.time() - 2.6).abs() <= 1.0 / 240.0,
+        "{}",
+        record.end.time()
+    );
     assert_eq!(record.final_arena_radius, 200.0);
 }
 

@@ -31,13 +31,20 @@ fn shipped() -> Vec<(PathBuf, Scenario)> {
 
 #[test]
 fn at_least_six_premises_ship() {
-    assert!(shipped().len() >= 6, "only {} Scenarios ship", shipped().len());
+    assert!(
+        shipped().len() >= 6,
+        "only {} Scenarios ship",
+        shipped().len()
+    );
 }
 
 #[test]
 fn every_shipped_scenario_has_its_own_hook_title() {
     let scenarios = shipped();
-    let mut titles: Vec<&str> = scenarios.iter().map(|(_, s)| s.hook_title.as_str()).collect();
+    let mut titles: Vec<&str> = scenarios
+        .iter()
+        .map(|(_, s)| s.hook_title.as_str())
+        .collect();
     titles.sort();
     titles.dedup();
     assert_eq!(titles.len(), scenarios.len(), "Hook Titles must differ");

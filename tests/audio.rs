@@ -138,13 +138,19 @@ fn boundary_hits_play_notes_only_with_the_play_note_rule() {
 
     let hit_notes = |record: &SimRecord| {
         let chord_at = (record.ending.start_substep * SAMPLES_PER_SUBSTEP) as usize;
-        voices(record).iter().filter(|v| v.start != chord_at).count()
+        voices(record)
+            .iter()
+            .filter(|v| v.start != chord_at)
+            .count()
     };
     // Without the Rule, only the final chord sounds.
     assert!(silent.boundary_hits.iter().all(|h| !h.plays_note));
     assert_eq!(hit_notes(&silent), 0);
     // With it, every Boundary Hit plays its assigned pitch.
-    assert!(playing.boundary_hits.iter().all(|h| h.plays_note && h.pitch > 0.0));
+    assert!(playing
+        .boundary_hits
+        .iter()
+        .all(|h| h.plays_note && h.pitch > 0.0));
     assert_eq!(hit_notes(&playing), playing.boundary_hits.len());
 }
 

@@ -1,0 +1,39 @@
+# Gravity + splitting: a falling ball splits in two on every Boundary Hit,
+# and the pile of bouncing balls fills the bowl until the Population Cap.
+
+name = "Gravity + splitting"
+hook_title = "Gravity is on and every bounce splits it"
+time_cap = 60.0
+population_cap = 1500
+
+[arena]
+radius = 460.0
+
+[ball]
+radius = 14.0
+speed = { min = 200.0, max = 260.0 }
+
+# Gentle gravity on purpose: stronger gravity presses balls onto the bottom
+# of the bowl, where they graze the Boundary and split every few substeps,
+# so the Population Cap arrives in ~10 s.
+[[rules]]
+kind = "gravity"
+strength = { min = 40.0, max = 80.0 }
+
+[[rules]]
+kind = "split"
+into = 2
+spread = { min = 4.0, max = 7.0 }
+
+[end_condition]
+kind = "population_cap"
+
+[look]
+counter = "ball_count"
+
+# Seeds outside these are rejected and replaced. Durations are Video length
+# in seconds (action plus the ~1.5 s ending hold).
+[quality_gate]
+min_duration = 25.0
+max_duration = 50.0
+min_boundary_hits = 800

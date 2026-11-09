@@ -1,21 +1,21 @@
 # One ball that gets faster and changes colour on every Boundary Hit,
-# up to the max speed.
+# up to the max speed. The Counter shows its speed.
 
 name = "Faster every bounce"
 hook_title = "It gets faster every bounce"
-time_cap = 20.0
+time_cap = { min = 28.0, max = 40.0 }
 
 [arena]
 radius = 460.0
 
 [ball]
 radius = 30.0
-speed = 900.0
+speed = { min = 750.0, max = 900.0 }
 max_speed = 4000.0
 
 [[rules]]
 kind = "speed_up"
-percent = 8.0
+percent = { min = 3.0, max = 5.0 }
 
 [[rules]]
 kind = "change_colour"
@@ -23,9 +23,12 @@ kind = "change_colour"
 [end_condition]
 kind = "time_cap"
 
+[look]
+counter = "speed"
+
 # Seeds outside these are rejected and replaced. Durations are Video length
 # in seconds (action plus the ~1.5 s ending hold).
 [quality_gate]
-min_duration = 20.0
-max_duration = 22.0
-min_boundary_hits = 40
+min_duration = 25.0
+max_duration = 45.0
+min_boundary_hits = 50

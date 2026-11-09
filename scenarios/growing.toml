@@ -10,7 +10,7 @@ radius = 460.0
 
 [ball]
 radius = 14.0
-speed = 900.0
+speed = { min = 850.0, max = 950.0 }
 
 # Bounces come faster as the ball grows (shorter chords), so the ending
 # accelerates on its own.
@@ -24,9 +24,13 @@ kind = "change_colour"
 [end_condition]
 kind = "arena_filled"
 
+# The note drops as the ball grows.
+[sound]
+pitch_mode = "ball_size"
+
 # Seeds outside these are rejected and replaced. Durations are Video length
 # in seconds (action plus the ~1.5 s ending hold).
 [quality_gate]
-min_duration = 15.0
-max_duration = 60.0
+min_duration = 25.0
+max_duration = 55.0
 min_boundary_hits = 40

@@ -70,8 +70,8 @@ const DEFAULT_TITLE: &str = "{hook_title}";
 /// Metadata templates (`[meta]` in a Scenario file, optional). Each may use
 /// `{placeholders}`: any value in the Scenario file by its path (`ball.speed`,
 /// `population_cap`, `rules[0].percent`, `hook_title`, ...), resolved for the
-/// Seed, plus `seed`, `palette`, `boundary_hits`, `balls` (final ball count)
-/// and `duration` (Video length in whole seconds).
+/// Seed, plus `seed`, `palette`, `instrument`, `scale`, `boundary_hits`,
+/// `balls` (final ball count) and `duration` (Video length in whole seconds).
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetaSpec {
@@ -85,7 +85,15 @@ pub struct MetaSpec {
 }
 
 /// Placeholders that come from the run rather than the Scenario file.
-const RECORD_VARS: &[&str] = &["seed", "palette", "boundary_hits", "balls", "duration"];
+const RECORD_VARS: &[&str] = &[
+    "seed",
+    "palette",
+    "instrument",
+    "scale",
+    "boundary_hits",
+    "balls",
+    "duration",
+];
 
 fn template_vars(
     mut vars: BTreeMap<String, String>,
@@ -94,6 +102,8 @@ fn template_vars(
     let values = [
         record.seed.to_string(),
         record.palette.clone(),
+        record.sound.instrument.name().to_string(),
+        record.sound.scale.name().to_string(),
         record.boundary_hits.len().to_string(),
         record.final_balls.len().to_string(),
         (record.ending.cut_time().round() as u64).to_string(),

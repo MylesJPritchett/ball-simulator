@@ -30,3 +30,8 @@ kind = "arena_filled"
 min_duration = 15.0
 max_duration = 60.0
 min_boundary_hits = 40
+
+[meta]
+title = "It grows {rules[0].amount} units every bounce - can it fill the Arena?"
+description = "One ball grows on every Boundary Hit until it fills the Arena: {boundary_hits} bounces in {duration} seconds."
+hashtags = ["growing", "fill"]

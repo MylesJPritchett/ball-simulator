@@ -34,7 +34,11 @@ fn ball_bouncing_in_the_arena_produces_regular_boundary_hits() {
     // off-centre chords are shorter, so at least ~5 in 5 seconds.
     let record = run(MINIMAL, 7);
 
-    assert!(record.boundary_hits.len() >= 5, "{:?}", record.boundary_hits.len());
+    assert!(
+        record.boundary_hits.len() >= 5,
+        "{:?}",
+        record.boundary_hits.len()
+    );
     for pair in record.boundary_hits.windows(2) {
         assert!(pair[0].substep < pair[1].substep, "hits are in time order");
     }

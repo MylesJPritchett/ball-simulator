@@ -191,9 +191,8 @@ impl Simulation {
             .as_ref()
             .filter(|cond| cond.is_met(&self.world, self.substep))
             .map(|cond| cond.id());
-        let fired = scenario_end.or(
-            (self.substep >= self.time_cap_substeps).then_some(end_condition::TIME_CAP),
-        );
+        let fired = scenario_end
+            .or((self.substep >= self.time_cap_substeps).then_some(end_condition::TIME_CAP));
         if let Some(id) = fired {
             self.end = Some(EndEvent {
                 condition: id.to_string(),

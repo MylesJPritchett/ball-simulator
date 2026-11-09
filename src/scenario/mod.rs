@@ -114,18 +114,25 @@ impl Scenario {
     }
 
     fn validate(&self) -> Result<(), ScenarioError> {
-        if !(self.time_cap > 0.0) {
+        if !is_positive(self.time_cap) {
             return Err(self.invalid("time_cap must be greater than 0"));
         }
-        if !(self.arena.radius > 0.0) {
+        if !is_positive(self.arena.radius) {
             return Err(self.invalid("arena.radius must be greater than 0"));
         }
         if !(self.ball.radius > 0.0 && self.ball.radius < self.arena.radius) {
-            return Err(self.invalid("ball.radius must be greater than 0 and smaller than arena.radius"));
+            return Err(
+                self.invalid("ball.radius must be greater than 0 and smaller than arena.radius")
+            );
         }
         // Building Rules and End Conditions validates their kinds and parameters.
         crate::rules::build_all(self).map_err(|m| self.invalid(m))?;
         crate::sim::end_condition::build(self).map_err(|m| self.invalid(m))?;
         Ok(())
     }
+}
+
+/// True for finite-or-infinite values above zero; false for zero, negatives and NaN.
+fn is_positive(v: f64) -> bool {
+    v > 0.0
 }

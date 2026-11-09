@@ -26,3 +26,8 @@ kind = "time_cap"
 min_duration = 40.0
 max_duration = 42.0
 min_boundary_hits = 300
+
+[meta]
+title = "The Arena is shrinking - {boundary_hits} bounces later..."
+description = "The Boundary closes in at {rules[0].rate} units a second, so the bounces come faster and faster."
+hashtags = ["shrinking", "tension"]

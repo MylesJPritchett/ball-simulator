@@ -62,7 +62,8 @@ pub fn build_all(scenario: &Scenario) -> Result<Vec<Box<dyn Rule>>, String> {
 
 /// Deserializes a Rule's parameters (every key of its table except `kind`).
 pub fn params<T: DeserializeOwned>(spec: &RuleSpec) -> Result<T, String> {
-    toml::Value::Table(spec.params.clone())
-        .try_into()
-        .map_err(|e| format!("Rule '{}': {e}", spec.kind))
+    serde_path_to_error::deserialize(toml::Value::Table(spec.params.clone())).map_err(|e| {
+        let message = crate::scenario::with_path(&e.path().to_string(), e.inner());
+        format!("Rule '{}': {message}", spec.kind)
+    })
 }

@@ -51,7 +51,8 @@ pub fn generate(scenario: &Scenario, seed: u64, out_root: &Path) -> Result<PathB
     let mp4 = dir.join("video.mp4");
     let mut encoder = VideoEncoder::start(&mp4, &wav, layout::WIDTH, layout::HEIGHT, FPS)?;
     let mut sim = Simulation::new(scenario, seed);
-    let mut renderer = Renderer::new(scenario.arena.radius);
+    // The Arena radius may be a range: use the Seed's resolved one.
+    let mut renderer = Renderer::new(sim.world().arena.radius);
     for _ in 0..frames {
         encoder.write_frame(renderer.draw(sim.world()))?;
         sim.step_frame();
@@ -60,8 +61,8 @@ pub fn generate(scenario: &Scenario, seed: u64, out_root: &Path) -> Result<PathB
     std::fs::remove_file(&wav).map_err(io_err(&wav))?;
 
     let meta_path = dir.join("meta.json");
-    let meta =
-        serde_json::to_string_pretty(&VideoMeta::new(scenario, seed)).expect("metadata serializes");
+    let meta = serde_json::to_string_pretty(&VideoMeta::new(scenario, &record))
+        .expect("metadata serializes");
     std::fs::write(&meta_path, meta).map_err(io_err(&meta_path))?;
 
     Ok(dir)

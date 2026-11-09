@@ -14,7 +14,7 @@ pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
 pub use world::{Arena, Ball, Vec2, World};
 
 use crate::rules::{self, Rule, RuleContext};
-use crate::scenario::Scenario;
+use crate::scenario::{ResolvedParam, Scenario};
 use end_condition::EndCondition;
 use rng::Rng;
 
@@ -39,6 +39,7 @@ pub fn run(scenario: &Scenario, seed: u64) -> SimRecord {
 
 pub struct Simulation {
     seed: u64,
+    parameters: Vec<ResolvedParam>,
     world: World,
     rules: Vec<Box<dyn Rule>>,
     end_condition: Option<Box<dyn EndCondition>>,
@@ -55,10 +56,13 @@ impl Simulation {
     /// The Scenario must have been validated (any `Scenario` from the
     /// `scenario` module constructors has been).
     pub fn new(scenario: &Scenario, seed: u64) -> Self {
+        let mut rng = Rng::from_seed(seed);
+        // Ranges resolve first, before any initial-state draws.
+        let (scenario, parameters) = scenario.resolve(&mut rng);
+        let scenario = &scenario;
         let rules = rules::build_all(scenario).expect("Scenario Rules were validated");
         let end_condition =
             end_condition::build(scenario).expect("Scenario End Condition was validated");
-        let mut rng = Rng::from_seed(seed);
 
         let mut world = World::new(Arena {
             radius: scenario.arena.radius,
@@ -82,6 +86,7 @@ impl Simulation {
 
         Simulation {
             seed,
+            parameters,
             world,
             rules,
             end_condition,
@@ -206,6 +211,7 @@ impl Simulation {
         let end = self.end.expect("into_record called before the run ended");
         SimRecord {
             seed: self.seed,
+            parameters: self.parameters,
             final_state_hash: hash_world(&self.world, self.substep),
             boundary_hits: self.boundary_hits,
             ball_count: self.ball_count,

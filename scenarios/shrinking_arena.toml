@@ -1,21 +1,30 @@
 # "The Arena is shrinking": the Boundary closes in on one ball, so Boundary
 # Hits (and notes) come faster and faster until it bottoms out.
+#
+# Boundary Hits are radial, so the ball's angular momentum about the centre
+# is conserved: its path never comes closer to the centre than where it
+# started. The ball starts within half of (arena.radius - ball.radius) of the
+# centre, so min_radius > 230 + ball.radius / 2 keeps it from ending up
+# skimming round the Boundary hundreds of times a second.
 
 name = "The Arena is shrinking"
 hook_title = "The Arena is shrinking"
-time_cap = 40.0
+time_cap = { min = 36.0, max = 42.0 }
 
 [arena]
 radius = 460.0
 
 [ball]
-radius = 30.0
-speed = 900.0
+radius = 60.0
+speed = { min = 1000.0, max = 1200.0 }
 
 [[rules]]
 kind = "shrinking_arena"
-rate = 10.0           # Arena radius lost per second
-min_radius = 80.0     # stops shrinking here
+rate = { min = 4.5, max = 5.5 }   # Arena radius lost per second
+min_radius = 280.0                # stops shrinking here
+
+[[rules]]
+kind = "change_colour"
 
 [end_condition]
 kind = "time_cap"
@@ -23,9 +32,9 @@ kind = "time_cap"
 # Seeds outside these are rejected and replaced. Durations are Video length
 # in seconds (action plus the ~1.5 s ending hold).
 [quality_gate]
-min_duration = 40.0
-max_duration = 42.0
-min_boundary_hits = 300
+min_duration = 30.0
+max_duration = 45.0
+min_boundary_hits = 50
 
 [meta]
 title = "The Arena is shrinking - {boundary_hits} bounces later..."

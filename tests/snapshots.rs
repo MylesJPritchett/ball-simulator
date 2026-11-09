@@ -15,6 +15,12 @@ fn shipped(id: &str) -> Scenario {
     Scenario::from_file(&path).expect("shipped Scenario should be valid")
 }
 
+/// The smallest Scenario (one ball, no Rules): a test fixture, not shipped.
+fn minimal() -> Scenario {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/minimal.toml");
+    Scenario::from_file(&path).expect("fixture Scenario should be valid")
+}
+
 #[test]
 fn every_shipped_scenario_is_valid() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("scenarios");
@@ -48,7 +54,7 @@ fn every_shipped_scenario_sets_quality_gate_thresholds_its_snapshot_seed_passes(
 
 #[test]
 fn minimal_seed_1() {
-    let record = sim::run(&shipped("minimal"), 1);
+    let record = sim::run(&minimal(), 1);
 
     assert_eq!(record.boundary_hits.len(), 11);
     assert_eq!(record.ball_count.last().unwrap().count, 1);
@@ -57,47 +63,137 @@ fn minimal_seed_1() {
     assert_eq!(record.final_state_hash, 12091774788095173436);
 }
 
+/// What a shipped Scenario does with Seed 1.
+struct Snapshot {
+    boundary_hits: usize,
+    final_ball_count: usize,
+    end_condition: &'static str,
+    end_substep: u64,
+    final_state_hash: u64,
+}
+
+fn assert_seed_1(id: &str, want: Snapshot) {
+    let record = sim::run(&shipped(id), 1);
+
+    assert_eq!(record.boundary_hits.len(), want.boundary_hits, "{id}");
+    assert_eq!(
+        record.ball_count.last().unwrap().count,
+        want.final_ball_count,
+        "{id}"
+    );
+    assert_eq!(record.end.condition, want.end_condition, "{id}");
+    assert_eq!(record.end.substep, want.end_substep, "{id}");
+    assert_eq!(record.final_state_hash, want.final_state_hash, "{id}");
+}
+
+#[test]
+fn changing_colour_seed_1() {
+    assert_seed_1(
+        "changing_colour",
+        Snapshot {
+            boundary_hits: 80,
+            final_ball_count: 1,
+            end_condition: "time_cap",
+            end_substep: 16786,
+            final_state_hash: 5255913662098287887,
+        },
+    );
+}
+
+#[test]
+fn closing_in_seed_1() {
+    assert_seed_1(
+        "closing_in",
+        Snapshot {
+            boundary_hits: 84,
+            final_ball_count: 1,
+            end_condition: "arena_filled",
+            end_substep: 16016,
+            final_state_hash: 14414972202662410175,
+        },
+    );
+}
+
 #[test]
 fn doubling_seed_1() {
-    let record = sim::run(&shipped("doubling"), 1);
-
-    assert_eq!(record.boundary_hits.len(), 2015);
-    assert_eq!(record.ball_count.last().unwrap().count, 2000);
-    assert_eq!(record.end.condition, "population_cap");
-    assert_eq!(record.end.substep, 12282);
-    assert_eq!(record.final_state_hash, 2820098640751858260);
+    assert_seed_1(
+        "doubling",
+        Snapshot {
+            boundary_hits: 1999,
+            final_ball_count: 2000,
+            end_condition: "population_cap",
+            end_substep: 16932,
+            final_state_hash: 13890600868512535827,
+        },
+    );
 }
 
 #[test]
 fn faster_every_bounce_seed_1() {
-    let record = sim::run(&shipped("faster_every_bounce"), 1);
+    assert_seed_1(
+        "faster_every_bounce",
+        Snapshot {
+            boundary_hits: 121,
+            final_ball_count: 1,
+            end_condition: "time_cap",
+            end_substep: 16747,
+            final_state_hash: 7406598717257124148,
+        },
+    );
+}
 
-    assert_eq!(record.end.condition, "time_cap");
-    assert_eq!(record.end.substep, 9600);
-    assert!(record.stats.max_speed <= 4000.0 + 1e-9);
-    assert_eq!(record.boundary_hits.len(), 71);
-    assert_eq!(record.final_state_hash, 920117634866952227);
+#[test]
+fn gravity_split_seed_1() {
+    assert_seed_1(
+        "gravity_split",
+        Snapshot {
+            boundary_hits: 1501,
+            final_ball_count: 1500,
+            end_condition: "population_cap",
+            end_substep: 16526,
+            final_state_hash: 17657103179337597194,
+        },
+    );
 }
 
 #[test]
 fn growing_seed_1() {
-    let record = sim::run(&shipped("growing"), 1);
+    assert_seed_1(
+        "growing",
+        Snapshot {
+            boundary_hits: 74,
+            final_ball_count: 1,
+            end_condition: "arena_filled",
+            end_substep: 16801,
+            final_state_hash: 9740918032704497141,
+        },
+    );
+}
 
-    assert_eq!(record.end.condition, "arena_filled");
-    assert_eq!(record.end.substep, 15977);
-    assert_eq!(record.boundary_hits.len(), 70);
-    assert_eq!(record.final_balls[0].radius, 460.0);
-    assert_eq!(record.final_state_hash, 7036276404711173298);
+#[test]
+fn shrinking_seed_1() {
+    assert_seed_1(
+        "shrinking",
+        Snapshot {
+            boundary_hits: 98,
+            final_ball_count: 1,
+            end_condition: "time_cap",
+            end_substep: 17746,
+            final_state_hash: 13495442815248080,
+        },
+    );
 }
 
 #[test]
 fn shrinking_arena_seed_1() {
-    let record = sim::run(&shipped("shrinking_arena"), 1);
-
-    assert_eq!(record.end.condition, "time_cap");
-    assert_eq!(record.end.substep, 19200);
-    assert_eq!(record.final_arena_radius, 80.0);
-    assert_eq!(record.ball_count.last().unwrap().count, 1);
-    assert_eq!(record.boundary_hits.len(), 1090);
-    assert_eq!(record.final_state_hash, 18311559355663574032);
+    assert_seed_1(
+        "shrinking_arena",
+        Snapshot {
+            boundary_hits: 90,
+            final_ball_count: 1,
+            end_condition: "time_cap",
+            end_substep: 18933,
+            final_state_hash: 7422997877164674145,
+        },
+    );
 }

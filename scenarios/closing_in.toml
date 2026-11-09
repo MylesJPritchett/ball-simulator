@@ -1,0 +1,49 @@
+# It grows while the Arena shrinks: the ball gets bigger on every Boundary
+# Hit as the Boundary closes in, until the ball fills what is left.
+
+name = "Closing in"
+hook_title = "It grows as the Arena shrinks"
+time_cap = 60.0
+
+[arena]
+radius = 460.0
+
+[ball]
+radius = 12.0
+speed = { min = 700.0, max = 850.0 }
+
+# Gravity keeps the ball from settling into a skim round the shrinking
+# Boundary (see shrinking_arena.toml).
+[[rules]]
+kind = "gravity"
+strength = { min = 300.0, max = 600.0 }
+
+[[rules]]
+kind = "shrinking_arena"
+rate = { min = 5.0, max = 7.0 }
+min_radius = 120.0
+
+[[rules]]
+kind = "grow"
+amount = { min = 2.5, max = 3.5 }
+
+[[rules]]
+kind = "change_colour"
+
+[end_condition]
+kind = "arena_filled"
+
+[look]
+palette = "ember"
+
+# Seeds outside these are rejected and replaced. Durations are Video length
+# in seconds (action plus the ~1.5 s ending hold).
+[quality_gate]
+min_duration = 25.0
+max_duration = 55.0
+min_boundary_hits = 60
+
+[meta]
+title = "It grows as the Arena shrinks - who wins?"
+description = "The ball grows {rules[2].amount} units on every Boundary Hit while the Boundary closes in at {rules[1].rate} units a second. It fills the Arena after {boundary_hits} bounces."
+hashtags = ["growing", "shrinking", "tension"]

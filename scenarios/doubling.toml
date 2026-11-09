@@ -11,23 +11,26 @@ radius = 460.0
 
 [ball]
 radius = 16.0
-speed = 250.0
+speed = { min = 230.0, max = 270.0 }
 
 # A narrow fan keeps the children's chords long; wider fans reach the cap
 # much sooner (spread 20 -> ~16 s, spread 12 -> ~20-33 s at this speed).
 [[rules]]
 kind = "split"
 into = 2
-spread = 12.0
+spread = { min = 7.0, max = 10.0 }
 
 [end_condition]
 kind = "population_cap"
 
+[look]
+counter = "ball_count"
+
 # Seeds outside these are rejected and replaced. Durations are Video length
 # in seconds (action plus the ~1.5 s ending hold).
 [quality_gate]
-min_duration = 18.0
-max_duration = 45.0
+min_duration = 25.0
+max_duration = 50.0
 min_boundary_hits = 1000
 
 [meta]

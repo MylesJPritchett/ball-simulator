@@ -159,7 +159,8 @@ fn render(
     let dir = video_dir(out_root, scenario, seed);
     std::fs::create_dir_all(&dir).map_err(io_err(&dir))?;
 
-    // The Video runs through the ending's hold, not just to the End Condition.
+    // The Video runs through the Ending's Play-out and hold, not just to the
+    // End Condition.
     let ending = record.ending;
     let frames = ending.frames();
 
@@ -174,9 +175,10 @@ fn render(
     // Built from the Seed's resolved Scenario (ranges such as the Arena radius
     // resolved), not the parsed file's lower bounds.
     let mut renderer = Renderer::new(sim.scenario());
-    // Frame k shows the state after k * SUBSTEPS_PER_FRAME substeps; once the
-    // run has ended `step_frame` does nothing, so the action freezes, the
-    // trails keep fading and the renderer plays the flash over the frozen frame.
+    // Frame k shows the state after k * SUBSTEPS_PER_FRAME substeps; the run
+    // keeps going through the Play-out, then `step_frame` does nothing, so the
+    // action freezes, the trails keep fading and the renderer plays the
+    // Ending's effects over it.
     for _ in 0..frames {
         encoder.write_frame(renderer.draw(&sim, Some(&ending)))?;
         sim.step_frame();

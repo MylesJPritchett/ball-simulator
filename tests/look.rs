@@ -70,7 +70,7 @@ fn read_counter_every_frame(toml: &str, seed: u64) -> (Vec<(u64, u64)>, SimRecor
     let mut readings = Vec::new();
     loop {
         readings.push((counter.read(&sim), sim.substep()));
-        if sim.is_ended() {
+        if sim.is_frozen() {
             break;
         }
         sim.step_frame();

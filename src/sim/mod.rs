@@ -12,7 +12,7 @@ pub mod record;
 pub mod rng;
 mod state;
 
-pub use ending::Ending;
+pub use ending::{Effect, Ending, EndingStyle, PlayOut};
 pub use quality_gate::{Rejection, Verdict};
 pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
 pub use state::{Arena, Ball, SimState, Vec2};
@@ -31,10 +31,11 @@ pub const SUBSTEPS_PER_FRAME: u64 = 8;
 /// Physics substep rate (480 Hz).
 pub const SUBSTEP_HZ: u64 = FPS * SUBSTEPS_PER_FRAME;
 
-/// Runs a Scenario headlessly with a Seed until an End Condition fires.
+/// Runs a Scenario headlessly with a Seed until an End Condition fires and its
+/// Play-out (if any) is over.
 pub fn run(scenario: &Scenario, seed: u64) -> SimRecord {
     let mut sim = Simulation::new(scenario, seed);
-    while !sim.is_ended() {
+    while !sim.is_frozen() {
         sim.step();
     }
     sim.into_record()
@@ -59,6 +60,10 @@ pub struct Simulation {
     ball_count: Vec<BallCountSample>,
     stats: SimStats,
     end: Option<EndEvent>,
+    /// The fired End Condition's Ending style.
+    ending_style: EndingStyle,
+    /// Substep the action froze, once the Play-out is over.
+    frozen_at: Option<u64>,
 }
 
 impl Simulation {
@@ -114,6 +119,8 @@ impl Simulation {
             ball_count,
             stats: SimStats::default(),
             end: None,
+            ending_style: EndingStyle::default(),
+            frozen_at: None,
         }
     }
 
@@ -142,33 +149,45 @@ impl Simulation {
         self.substep
     }
 
-    pub fn is_ended(&self) -> bool {
-        self.end.is_some()
+    /// Whether the action has frozen: the End Condition has fired and its
+    /// Play-out (if any) is over. The simulation no longer changes.
+    pub fn is_frozen(&self) -> bool {
+        self.frozen_at.is_some()
     }
 
+    /// The End Condition that fired, once one has (the Play-out may still be
+    /// running).
     pub fn end(&self) -> Option<&EndEvent> {
         self.end.as_ref()
     }
 
-    /// The Ending that follows the End Condition, once it has fired.
+    /// The Ending that follows the End Condition, once it has fired. While an
+    /// open-ended ([`PlayOut::Until`]) Play-out is still running, its freeze
+    /// (and so the cut) is the Play-out's maximum; it is final once frozen.
     pub fn ending(&self) -> Option<Ending> {
-        self.end.as_ref().map(|end| Ending::new(end.substep))
+        let end = self.end.as_ref()?;
+        let style = &self.ending_style;
+        let freeze = self
+            .frozen_at
+            .unwrap_or(end.substep + style.play_out.max_substeps());
+        Some(Ending::new(end.substep, freeze, style))
     }
 
     /// Advances one frame (up to [`SUBSTEPS_PER_FRAME`] substeps, fewer if the
-    /// run ends mid-frame).
+    /// action freezes mid-frame).
     pub fn step_frame(&mut self) {
         for _ in 0..SUBSTEPS_PER_FRAME {
-            if self.is_ended() {
+            if self.is_frozen() {
                 break;
             }
             self.step();
         }
     }
 
-    /// Advances one substep. Does nothing once the run has ended.
+    /// Advances one substep. Keeps going through the Play-out after the End
+    /// Condition fires; does nothing once the action has frozen.
     pub fn step(&mut self) {
-        if self.is_ended() {
+        if self.is_frozen() {
             return;
         }
         let dt = 1.0 / SUBSTEP_HZ as f64;
@@ -222,13 +241,17 @@ impl Simulation {
             hit.colour = self.state.balls[index].colour;
             self.boundary_hits.push(hit);
         }
+        self.state.remove_vanished();
         // Rules may have grown balls past the Boundary.
         self.state.contain();
         self.state.limit_speed(self.max_speed);
 
         self.substep = completed;
         self.measure();
-        self.check_end();
+        if self.end.is_none() {
+            self.check_end();
+        }
+        self.check_freeze();
     }
 
     fn measure(&mut self) {
@@ -254,10 +277,12 @@ impl Simulation {
             .end_condition
             .as_ref()
             .filter(|cond| cond.is_met(&self.state, self.substep))
-            .map(|cond| cond.id());
-        let fired = scenario_end
-            .or((self.substep >= self.time_cap_substeps).then_some(end_condition::TIME_CAP));
-        if let Some(id) = fired {
+            .map(|cond| (cond.id(), cond.ending()));
+        // The time cap gets the default Ending.
+        let fired = scenario_end.or((self.substep >= self.time_cap_substeps)
+            .then(|| (end_condition::TIME_CAP, EndingStyle::default())));
+        if let Some((id, style)) = fired {
+            self.ending_style = style;
             self.end = Some(EndEvent {
                 condition: id.to_string(),
                 substep: self.substep,
@@ -265,7 +290,24 @@ impl Simulation {
         }
     }
 
-    /// Finishes the run. Call once [`Simulation::is_ended`] is true.
+    /// Freezes the action once the fired End Condition's Play-out is over.
+    fn check_freeze(&mut self) {
+        let Some(end) = &self.end else {
+            return;
+        };
+        let play_out = self.ending_style.play_out;
+        let over = self.substep - end.substep >= play_out.max_substeps()
+            || matches!(play_out, PlayOut::Until { .. })
+                && self
+                    .end_condition
+                    .as_ref()
+                    .is_some_and(|cond| cond.play_out_done(&self.state, self.substep));
+        if over {
+            self.frozen_at = Some(self.substep);
+        }
+    }
+
+    /// Finishes the run. Call once [`Simulation::is_frozen`] is true.
     pub fn into_record(self) -> SimRecord {
         let ending = self
             .ending()

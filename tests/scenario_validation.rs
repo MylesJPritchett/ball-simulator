@@ -116,3 +116,17 @@ fn unknown_quality_gate_threshold_is_named_in_the_error() {
         "{err}"
     );
 }
+
+#[test]
+fn shrink_has_no_minimum_radius() {
+    // A shrinking ball vanishes instead of stopping at a minimum.
+    let toml = format!(
+        "{}\n[[rules]]\nkind = \"shrink\"\namount = 2.0\nmin_radius = 4.0\n",
+        complete()
+    );
+    let err = error_for(&toml);
+    assert!(
+        err.contains("broken") && err.contains("shrink") && err.contains("min_radius"),
+        "{err}"
+    );
+}

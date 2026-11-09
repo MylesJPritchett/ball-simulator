@@ -26,7 +26,8 @@ pub struct SimRecord {
     pub ball_count: Vec<BallCountSample>,
     /// Which End Condition fired and when.
     pub end: EndEvent,
-    /// Timing of the freeze, flash and hold that follow the End Condition.
+    /// Timing of the Play-out, freeze, flash and hold that follow the End
+    /// Condition.
     pub ending: Ending,
     pub stats: SimStats,
     /// The Quality Gate's verdict on this Seed.

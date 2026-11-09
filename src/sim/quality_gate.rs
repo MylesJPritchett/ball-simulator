@@ -29,7 +29,7 @@ impl Verdict {
 }
 
 /// Why a Seed was rejected. Durations are Video length in seconds, including
-/// the ending's hold.
+/// the Ending's Play-out and hold.
 #[derive(Debug, Clone, PartialEq, Serialize, thiserror::Error)]
 pub enum Rejection {
     #[error("the End Condition never fired before the {time_cap} s time cap")]

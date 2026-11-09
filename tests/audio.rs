@@ -240,6 +240,22 @@ fn a_final_chord_plays_when_the_end_condition_fires() {
 }
 
 #[test]
+fn the_final_chord_plays_when_a_ball_vanishes_not_at_the_freeze() {
+    use ball_simulator::audio::{voices, SAMPLES_PER_SUBSTEP};
+    let toml = format!(
+        "{MINIMAL}\n[[rules]]\nkind = \"shrink\"\namount = 10.0\n\n\
+         [end_condition]\nkind = \"vanished\"\n"
+    );
+    let record = run(&toml, 3);
+    assert_eq!(record.end.condition, "vanished");
+    let fired = (record.ending.start_substep * SAMPLES_PER_SUBSTEP) as usize;
+    assert!(record.ending.freeze_substep > record.ending.start_substep);
+
+    let chord = voices(&record).iter().filter(|v| v.start == fired).count();
+    assert!(chord >= 3, "chord has {chord} notes");
+}
+
+#[test]
 fn the_final_mix_never_clips_even_with_2000_balls() {
     use ball_simulator::audio::{synthesize, SAMPLE_RATE};
     for instrument in ["sine_bell", "pluck", "marimba"] {

@@ -2,11 +2,14 @@
 //! applies; a Scenario may add one more via `[end_condition] kind = "..."`.
 //!
 //! Adding an End Condition: implement [`EndCondition`] (in this file or a
-//! sibling module) and add a match arm in [`build`].
+//! sibling module) and add a match arm in [`build`]. Override
+//! [`EndCondition::ending`] to give its Ending a Play-out, or to drop the
+//! flash or the final chord.
 
 use serde::Deserialize;
 
 use crate::scenario::{RuleSpec, Scenario};
+use crate::sim::ending::{Effect, EndingStyle, PlayOut};
 use crate::sim::SimState;
 
 pub const TIME_CAP: &str = "time_cap";
@@ -15,6 +18,7 @@ pub const ARENA_FILLED: &str = "arena_filled";
 pub const MAX_SPEED_REACHED: &str = "max_speed_reached";
 pub const MIN_RADIUS_REACHED: &str = "min_radius_reached";
 pub const ARENA_MIN_REACHED: &str = "arena_min_reached";
+pub const VANISHED: &str = "vanished";
 
 pub trait EndCondition {
     /// Id written to `SimRecord::end.condition`.
@@ -22,6 +26,19 @@ pub trait EndCondition {
 
     /// Checked at the end of every substep, after Rules have run.
     fn is_met(&self, state: &SimState, substep: u64) -> bool;
+
+    /// The shape of the Ending once this fires. Default: no Play-out, with a
+    /// flash and the final chord.
+    fn ending(&self) -> EndingStyle {
+        EndingStyle::default()
+    }
+
+    /// For a [`PlayOut::Until`] Play-out: whether the Terminal State has
+    /// finished on screen, so the action can freeze. Checked at the end of
+    /// every substep from the one this fired on.
+    fn play_out_done(&self, _state: &SimState, _substep: u64) -> bool {
+        true
+    }
 }
 
 /// Builds the Scenario's End Condition. `time_cap` builds nothing: the
@@ -52,6 +69,10 @@ pub fn build(scenario: &Scenario) -> Result<Option<Box<dyn EndCondition>>, Strin
         ARENA_MIN_REACHED => Ok(Some(Box::new(ArenaMinReached {
             min_radius: min_radius(spec)?,
         }))),
+        VANISHED => {
+            no_params(spec)?;
+            Ok(Some(Box::new(Vanished)))
+        }
         other => Err(format!("unknown End Condition '{other}'")),
     }
 }
@@ -162,5 +183,32 @@ impl EndCondition for ArenaMinReached {
 
     fn is_met(&self, state: &SimState, _substep: u64) -> bool {
         state.arena.radius <= self.min_radius
+    }
+}
+
+/// How long a vanished ball's pop plays out before the freeze.
+pub const POP_SECONDS: f64 = 0.3;
+
+/// A ball has vanished from the Arena (e.g. shrunk to nothing by the shrink
+/// Rule). It pops: a ring expands and fades where it was.
+struct Vanished;
+
+impl EndCondition for Vanished {
+    fn id(&self) -> &'static str {
+        VANISHED
+    }
+
+    fn is_met(&self, state: &SimState, _substep: u64) -> bool {
+        !state.vanished.is_empty()
+    }
+
+    fn ending(&self) -> EndingStyle {
+        EndingStyle {
+            play_out: PlayOut::For {
+                seconds: POP_SECONDS,
+            },
+            effect: Effect::Pop,
+            ..EndingStyle::default()
+        }
     }
 }

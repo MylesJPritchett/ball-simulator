@@ -1,5 +1,6 @@
 # It shrinks every bounce: one big ball gets smaller (and a little faster)
-# on every Boundary Hit, and its note climbs as it shrinks.
+# on every Boundary Hit, and its note climbs as it shrinks, until it shrinks
+# to nothing and pops.
 
 name = "Shrinking"
 hook_title = "It shrinks every bounce"
@@ -16,7 +17,6 @@ max_speed = 3000.0
 [[rules]]
 kind = "shrink"
 amount = { min = 3.0, max = 4.0 }
-min_radius = 10.0
 
 [[rules]]
 kind = "speed_up"
@@ -26,17 +26,16 @@ percent = { min = 1.5, max = 2.5 }
 [[rules]]
 kind = "play_note"
 
-# The payoff: it bottoms out at its smallest.
+# The Terminal State: the hit that would shrink it to nothing pops it.
 [end_condition]
-kind = "min_radius_reached"
-min_radius = 10.0
+kind = "vanished"
 
 # Smaller ball, higher note.
 [sound]
 pitch_mode = "ball_size"
 
 # Seeds outside these are rejected and replaced. Durations are Video length
-# in seconds (action plus the ~1.5 s ending hold).
+# in seconds (action plus the ~0.3 s pop and the ~1.5 s ending hold).
 [quality_gate]
 min_duration = 25.0
 max_duration = 45.0

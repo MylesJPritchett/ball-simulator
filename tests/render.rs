@@ -4,7 +4,7 @@
 mod support;
 
 use ball_simulator::render::{layout, Renderer};
-use ball_simulator::sim::{self, Simulation, SUBSTEP_HZ};
+use ball_simulator::sim::{self, Effect, Ending, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
 use support::{scenario, MINIMAL};
 
 /// Width of the Boundary stroke as drawn (just outside the Arena's edge).
@@ -12,9 +12,20 @@ const BOUNDARY_WIDTH: f32 = 6.0;
 
 /// Draws `frames` frames (frame 0 first) with the run's Ending, calling
 /// `each` on every frame.
-fn draw_frames(toml: &str, seed: u64, frames: u64, mut each: impl FnMut(&Simulation, &[u8])) {
+fn draw_frames(toml: &str, seed: u64, frames: u64, each: impl FnMut(&Simulation, &[u8])) {
+    draw_frames_with(toml, seed, frames, |ending| ending, each);
+}
+
+/// As [`draw_frames`], drawing with the run's Ending as `edit` changes it.
+fn draw_frames_with(
+    toml: &str,
+    seed: u64,
+    frames: u64,
+    edit: impl Fn(Ending) -> Ending,
+    mut each: impl FnMut(&Simulation, &[u8]),
+) {
     let scenario = scenario(toml);
-    let ending = sim::run(&scenario, seed).ending;
+    let ending = edit(sim::run(&scenario, seed).ending);
     let mut sim = Simulation::new(&scenario, seed);
     let mut renderer = Renderer::new(sim.scenario());
     for k in 0..frames {
@@ -121,4 +132,92 @@ fn the_ending_flashes_when_the_end_condition_fires_and_fades_before_the_cut() {
         dark,
         "the flash has gone before the cut"
     );
+}
+
+/// One ball that shrinks to nothing on its third Boundary Hit and pops.
+fn vanishing() -> String {
+    format!(
+        "{MINIMAL}\n[[rules]]\nkind = \"shrink\"\namount = 10.0\n\n\
+         [end_condition]\nkind = \"vanished\"\n"
+    )
+}
+
+#[test]
+fn a_vanished_ball_pops_during_the_play_out_and_the_pop_is_gone_by_the_freeze() {
+    let toml = format!("{}\n[look]\ntrails = false\nglow = false\n", vanishing());
+    let record = support::run(&toml, 3);
+    let ending = record.ending;
+    let frames = ending.frames();
+    // The same frames with and without the pop drawn.
+    let draw = |effect: Effect| {
+        let mut out = Vec::new();
+        draw_frames_with(
+            &toml,
+            3,
+            frames,
+            |e| Ending { effect, ..e },
+            |_, f| out.push(f.to_vec()),
+        );
+        out
+    };
+    let popped = draw(Effect::Pop);
+    let plain = draw(Effect::None);
+
+    // Where the ball was when it vanished, on screen.
+    let arena = layout::arena();
+    let scale = arena.radius / 460.0;
+    let mut gone = Simulation::new(&scenario(&toml), 3);
+    while gone.end().is_none() {
+        gone.step();
+    }
+    let ball = &gone.state().vanished[0];
+    let (bx, by) = (
+        arena.center_x + ball.pos.x as f32 * scale,
+        arena.center_y + ball.pos.y as f32 * scale,
+    );
+
+    let frame_of = |substep: u64| substep.div_ceil(SUBSTEPS_PER_FRAME) as usize;
+    let (first, freeze) = (
+        frame_of(ending.start_substep),
+        frame_of(ending.freeze_substep),
+    );
+    for k in first..freeze {
+        let differing: Vec<(usize, usize)> = (0..layout::HEIGHT as usize)
+            .flat_map(|y| (0..layout::WIDTH as usize).map(move |x| (x, y)))
+            .filter(|&(x, y)| {
+                let i = (y * layout::WIDTH as usize + x) * 4;
+                popped[k][i..i + 3] != plain[k][i..i + 3]
+            })
+            .collect();
+        assert!(!differing.is_empty(), "frame {k}: the pop shows");
+        for (x, y) in differing {
+            assert!(
+                (x as f32 - bx).hypot(y as f32 - by) < 250.0,
+                "frame {k}: the pop is where the ball was, not at {x},{y}"
+            );
+        }
+    }
+    for k in freeze..frames as usize {
+        assert!(popped[k] == plain[k], "frame {k}: the pop has gone");
+    }
+}
+
+#[test]
+fn the_same_seed_gives_the_same_record_frames_and_samples_with_a_play_out() {
+    let toml = vanishing();
+    let video = || {
+        let record = support::run(&toml, 3);
+        let mut frames = Vec::new();
+        draw_frames(&toml, 3, record.ending.frames(), |_, f| {
+            frames.push(f.to_vec())
+        });
+        let samples = ball_simulator::audio::synthesize(&record);
+        (record, frames, samples)
+    };
+    let (first, second) = (video(), video());
+
+    assert!(first.0.ending.freeze_substep > first.0.ending.start_substep);
+    assert_eq!(first.0, second.0);
+    assert!(first.1 == second.1, "same frames");
+    assert!(first.2 == second.2, "same samples");
 }

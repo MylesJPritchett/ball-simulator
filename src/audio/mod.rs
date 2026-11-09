@@ -97,9 +97,15 @@ pub fn voices(record: &SimRecord) -> Vec<Voice> {
     }
 
     let sound = &record.sound;
+    // The chord sounds when the End Condition fires, not at the freeze.
     let chord_start = (record.ending.start_substep * SAMPLES_PER_SUBSTEP) as usize;
     let chord_len = (CHORD_SECONDS * SAMPLE_RATE as f64) as usize;
-    for &semis in sound.scale.chord() {
+    let chord: &[i32] = if record.ending.final_chord {
+        sound.scale.chord()
+    } else {
+        &[]
+    };
+    for &semis in chord {
         play(
             &mut out,
             chord_start,

@@ -1,0 +1,21 @@
+# "The Arena is shrinking": the Boundary closes in on one ball, so Boundary
+# Hits (and notes) come faster and faster until it bottoms out.
+
+name = "The Arena is shrinking"
+hook_title = "The Arena is shrinking"
+time_cap = 40.0
+
+[arena]
+radius = 460.0
+
+[ball]
+radius = 30.0
+speed = 900.0
+
+[[rules]]
+kind = "shrinking_arena"
+rate = 10.0           # Arena radius lost per second
+min_radius = 80.0     # stops shrinking here
+
+[end_condition]
+kind = "time_cap"

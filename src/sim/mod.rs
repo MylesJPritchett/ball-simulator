@@ -213,6 +213,7 @@ impl Simulation {
             seed: self.seed,
             parameters: self.parameters,
             final_state_hash: hash_world(&self.world, self.substep),
+            final_arena_radius: self.world.arena.radius,
             boundary_hits: self.boundary_hits,
             ball_count: self.ball_count,
             end,

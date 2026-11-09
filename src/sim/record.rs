@@ -23,6 +23,9 @@ pub struct SimRecord {
     /// Which End Condition fired and when.
     pub end: EndEvent,
     pub stats: SimStats,
+    /// Arena radius when the run ended (differs from the Scenario's if a Rule
+    /// changed it, e.g. shrinking_arena).
+    pub final_arena_radius: f64,
     /// Hash of the final simulation state; changes if behaviour changes at all.
     pub final_state_hash: u64,
 }

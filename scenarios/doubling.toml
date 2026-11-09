@@ -20,6 +20,10 @@ kind = "split"
 into = 2
 spread = { min = 7.0, max = 10.0 }
 
+# Every Boundary Hit plays a note.
+[[rules]]
+kind = "play_note"
+
 [end_condition]
 kind = "population_cap"
 

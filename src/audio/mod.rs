@@ -45,6 +45,7 @@ fn total_samples(record: &SimRecord) -> usize {
 }
 
 /// Schedules every note of the soundtrack: one per distinct pitch per substep
+/// among the Boundary Hits that play a note
 /// (simultaneous hits on the same note merge into one, a little louder), then
 /// the final chord when the End Condition fires, all under [`MAX_VOICES`].
 pub fn voices(record: &SimRecord) -> Vec<Voice> {
@@ -53,7 +54,7 @@ pub fn voices(record: &SimRecord) -> Vec<Voice> {
 
     // (start sample, pitch, hits merged), in time order.
     let mut notes: Vec<(usize, f64, usize)> = Vec::new();
-    for hit in &record.boundary_hits {
+    for hit in record.boundary_hits.iter().filter(|h| h.plays_note) {
         let start = (hit.substep * SAMPLES_PER_SUBSTEP) as usize;
         match notes
             .iter_mut()

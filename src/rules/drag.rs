@@ -2,9 +2,9 @@
 
 use serde::Deserialize;
 
-use super::{params, Rule, RuleContext};
+use super::{non_negative_finite, params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
-use crate::sim::World;
+use crate::sim::SimState;
 
 pub struct Drag {
     /// Decay rate per second: speed follows `v0 * e^(-strength * t)`.
@@ -20,19 +20,16 @@ struct Params {
 impl Drag {
     pub fn from_spec(spec: &RuleSpec) -> Result<Self, String> {
         let p: Params = params(spec)?;
-        if !(p.strength.is_finite() && p.strength >= 0.0) {
-            return Err("Rule 'drag': strength must be a finite number >= 0".to_string());
-        }
         Ok(Drag {
-            strength: p.strength,
+            strength: non_negative_finite(spec, "strength", p.strength)?,
         })
     }
 }
 
 impl Rule for Drag {
-    fn on_substep(&mut self, world: &mut World, ctx: &mut RuleContext) {
+    fn on_substep(&mut self, state: &mut SimState, ctx: &mut RuleContext) {
         let factor = (-self.strength * ctx.dt).exp();
-        for ball in &mut world.balls {
+        for ball in &mut state.balls {
             ball.vel = ball.vel * factor;
         }
     }

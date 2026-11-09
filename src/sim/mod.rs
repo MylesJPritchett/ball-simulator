@@ -10,12 +10,12 @@ pub mod ending;
 pub mod quality_gate;
 pub mod record;
 pub mod rng;
-mod world;
+mod state;
 
 pub use ending::Ending;
 pub use quality_gate::{Rejection, Verdict};
 pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
-pub use world::{Arena, Ball, Vec2, World};
+pub use state::{Arena, Ball, SimState, Vec2};
 
 use crate::audio::music::Sound;
 use crate::look::{palette, Palette};
@@ -47,7 +47,7 @@ pub struct Simulation {
     parameters: Vec<ResolvedParam>,
     sound: Sound,
     palette: &'static Palette,
-    world: World,
+    state: SimState,
     rules: Vec<Box<dyn Rule>>,
     end_condition: Option<Box<dyn EndCondition>>,
     rng: Rng,
@@ -73,7 +73,7 @@ impl Simulation {
         let end_condition =
             end_condition::build(scenario).expect("Scenario End Condition was validated");
 
-        let mut world = World::new(Arena {
+        let mut state = SimState::new(Arena {
             radius: scenario.arena.radius,
         });
         // The ball starts somewhere in the inner half of the Arena, already moving.
@@ -82,7 +82,7 @@ impl Simulation {
         let start_angle = rng.range_f64(0.0, std::f64::consts::TAU);
         let start_dist = max_start * rng.next_f64().sqrt();
         let dir = rng.range_f64(0.0, std::f64::consts::TAU);
-        world.spawn(
+        state.spawn(
             Vec2::from_angle(start_angle) * start_dist,
             Vec2::from_angle(dir) * ball.speed,
             ball.radius,
@@ -93,7 +93,7 @@ impl Simulation {
 
         let ball_count = vec![BallCountSample {
             substep: 0,
-            count: world.balls.len(),
+            count: state.balls.len(),
         }];
 
         Simulation {
@@ -101,7 +101,7 @@ impl Simulation {
             parameters,
             sound,
             palette: palette::for_video(scenario.look.palette.as_deref(), seed),
-            world,
+            state,
             rules,
             end_condition,
             rng,
@@ -117,12 +117,12 @@ impl Simulation {
         }
     }
 
-    pub fn world(&self) -> &World {
-        &self.world
+    pub fn state(&self) -> &SimState {
+        &self.state
     }
 
     /// The Scenario as this Seed resolved it: per-Seed values (Arena radius,
-    /// ball size...) come from here, not from the template's fields.
+    /// ball size...) come from here, not from the parsed Scenario's fields.
     pub fn scenario(&self) -> &Scenario {
         &self.scenario
     }
@@ -173,17 +173,20 @@ impl Simulation {
             substep: self.substep,
             dt,
         };
+        let radius_before = self.state.arena.radius;
         for rule in &mut self.rules {
-            rule.on_substep(&mut self.world, &mut ctx);
+            rule.on_substep(&mut self.state, &mut ctx);
         }
-        self.world.limit_speed(self.max_speed);
+        self.state.limit_speed(self.max_speed);
+        // How fast the Boundary moved inward this substep (0 for a fixed Arena).
+        let closing_speed = (radius_before - self.state.arena.radius) / dt;
 
         let completed = self.substep + 1;
         let mut hits = Vec::new();
-        let arena_radius = self.world.arena.radius;
-        for (index, ball) in self.world.balls.iter_mut().enumerate() {
+        let arena_radius = self.state.arena.radius;
+        for (index, ball) in self.state.balls.iter_mut().enumerate() {
             ball.pos += ball.vel * dt;
-            if let Some(angle) = resolve_boundary(ball, &self.world.arena) {
+            if let Some(angle) = resolve_boundary(ball, &self.state.arena, closing_speed) {
                 let hit_index = self.boundary_hits.len() + hits.len();
                 let pitch = self
                     .sound
@@ -197,6 +200,7 @@ impl Simulation {
                         pitch,
                         speed: ball.vel.length(),
                         colour: ball.colour,
+                        plays_note: false,
                     },
                 ));
             }
@@ -204,18 +208,18 @@ impl Simulation {
 
         for (index, mut hit) in hits {
             for rule in &mut self.rules {
-                rule.on_boundary_hit(&mut self.world, index, &hit, &mut ctx);
+                rule.on_boundary_hit(&mut self.state, index, &mut hit, &mut ctx);
                 // Population Cap: drop balls a Rule just added beyond the cap. The
                 // count was within the cap before this hit, so only new balls go
                 // and pending hit indices stay valid.
-                self.world.balls.truncate(self.population_cap);
+                self.state.balls.truncate(self.population_cap);
             }
-            hit.colour = self.world.balls[index].colour;
+            hit.colour = self.state.balls[index].colour;
             self.boundary_hits.push(hit);
         }
         // Rules may have grown balls past the Boundary.
-        self.world.contain();
-        self.world.limit_speed(self.max_speed);
+        self.state.contain();
+        self.state.limit_speed(self.max_speed);
 
         self.substep = completed;
         self.measure();
@@ -223,15 +227,15 @@ impl Simulation {
     }
 
     fn measure(&mut self) {
-        let arena = &self.world.arena;
-        for ball in &self.world.balls {
+        let arena = &self.state.arena;
+        for ball in &self.state.balls {
             let overshoot = ball.pos.length() + ball.radius - arena.radius;
             if overshoot > self.stats.max_boundary_overshoot {
                 self.stats.max_boundary_overshoot = overshoot;
             }
             self.stats.max_speed = self.stats.max_speed.max(ball.vel.length());
         }
-        let count = self.world.balls.len();
+        let count = self.state.balls.len();
         if self.ball_count.last().map(|s| s.count) != Some(count) {
             self.ball_count.push(BallCountSample {
                 substep: self.substep,
@@ -244,7 +248,7 @@ impl Simulation {
         let scenario_end = self
             .end_condition
             .as_ref()
-            .filter(|cond| cond.is_met(&self.world, self.substep))
+            .filter(|cond| cond.is_met(&self.state, self.substep))
             .map(|cond| cond.id());
         let fired = scenario_end
             .or((self.substep >= self.time_cap_substeps).then_some(end_condition::TIME_CAP));
@@ -264,14 +268,14 @@ impl Simulation {
             parameters: self.parameters,
             sound: self.sound,
             palette: self.palette.name.to_string(),
-            final_state_hash: hash_world(&self.world, self.substep),
-            final_arena_radius: self.world.arena.radius,
+            final_state_hash: hash_state(&self.state, self.substep),
+            final_arena_radius: self.state.arena.radius,
             boundary_hits: self.boundary_hits,
             ball_count: self.ball_count,
             ending: Ending::new(end.substep),
             end,
             stats: self.stats,
-            final_balls: self.world.balls,
+            final_balls: self.state.balls,
             quality_gate: Verdict::Accepted,
         };
         record.quality_gate = quality_gate::judge(&self.scenario, &record);
@@ -279,28 +283,45 @@ impl Simulation {
     }
 }
 
-/// Exact circle Boundary resolution: if the ball is touching or past the
-/// Boundary, reflect its velocity about the Boundary normal (if moving outward)
-/// and push it back to exactly touch the Boundary from inside. Returns the hit
-/// angle on the Boundary if it hit.
-fn resolve_boundary(ball: &mut Ball, arena: &Arena) -> Option<f64> {
+/// Outward speed (relative to the Boundary, units/s) below which a ball
+/// touching the Boundary is resting on it rather than hitting it. Gravity
+/// pushes a settled ball outward by `strength / SUBSTEP_HZ` every substep
+/// (about 2 units/s for the strongest shipped gravity); a bounce this slow
+/// would rise less than a unit, so nothing visible or audible is lost.
+const RESTING_SPEED: f64 = 30.0;
+
+/// Exact circle Boundary resolution. A ball touching or past the Boundary is
+/// put back to exactly touch it from inside. It is a Boundary Hit only if the
+/// ball is moving outward relative to the Boundary, which moves inward at
+/// `closing_speed` while the Arena shrinks: then its velocity is reflected
+/// about the Boundary normal in the Boundary's frame. A ball resting on
+/// (outward slower than [`RESTING_SPEED`]) or already leaving the Boundary is
+/// not hitting it. Returns the hit angle on the Boundary if it hit.
+fn resolve_boundary(ball: &mut Ball, arena: &Arena, closing_speed: f64) -> Option<f64> {
     let limit = arena.radius - ball.radius;
     let dist = ball.pos.length();
     if dist < limit || dist == 0.0 {
         return None;
     }
     let normal = ball.pos * (1.0 / dist);
-    let outward = ball.vel.dot(normal);
-    if outward > 0.0 {
-        ball.vel -= normal * (2.0 * outward);
-    }
     ball.pos = normal * limit;
+    let outward = ball.vel.dot(normal) + closing_speed;
+    if outward <= 0.0 {
+        return None;
+    }
+    if outward < RESTING_SPEED {
+        // Resting contact: the ball moves with the Boundary instead of
+        // bouncing off it by an invisible amount every substep.
+        ball.vel -= normal * outward;
+        return None;
+    }
+    ball.vel -= normal * (2.0 * outward);
     Some(normal.angle())
 }
 
 /// FNV-1a over the bit patterns of the final state. Stable across runs and
 /// platforms with the same float behaviour.
-fn hash_world(world: &World, substep: u64) -> u64 {
+fn hash_state(state: &SimState, substep: u64) -> u64 {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     let mut feed = |v: u64| {
         for byte in v.to_le_bytes() {
@@ -309,9 +330,9 @@ fn hash_world(world: &World, substep: u64) -> u64 {
         }
     };
     feed(substep);
-    feed(world.arena.radius.to_bits());
-    feed(world.balls.len() as u64);
-    for b in &world.balls {
+    feed(state.arena.radius.to_bits());
+    feed(state.balls.len() as u64);
+    for b in &state.balls {
         feed(b.id as u64);
         feed(b.pos.x.to_bits());
         feed(b.pos.y.to_bits());

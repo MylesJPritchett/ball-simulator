@@ -39,7 +39,7 @@ impl Running {
     /// pipeline, and restarts with the run.
     fn start(scenario: Scenario, seed: u64) -> Self {
         let sim = Simulation::new(&scenario, seed);
-        // Built from the Seed's resolved Scenario, not the template.
+        // Built from the Seed's resolved Scenario, not the parsed file's lower bounds.
         let mut renderer = Renderer::new(sim.scenario());
         renderer.draw(&sim);
         Running {

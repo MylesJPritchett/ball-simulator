@@ -46,10 +46,7 @@ pub enum Rejection {
 pub fn judge(scenario: &Scenario, record: &SimRecord) -> Verdict {
     let gate = &scenario.quality_gate;
     // When the time cap is the Scenario's End Condition, reaching it is the payoff.
-    let expects_time_cap = scenario
-        .end_condition
-        .as_ref()
-        .is_none_or(|spec| spec.kind == TIME_CAP);
+    let expects_time_cap = scenario.end_condition.kind == TIME_CAP;
     let seconds = record.ending.cut_time();
     let hits = record.boundary_hits.len();
     let rejection = if !expects_time_cap && record.end.condition == TIME_CAP {

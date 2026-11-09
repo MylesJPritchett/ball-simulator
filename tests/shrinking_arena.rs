@@ -33,6 +33,22 @@ fn arena_stops_shrinking_at_the_minimum_radius() {
 }
 
 #[test]
+fn arena_min_reached_ends_when_the_arena_stops_shrinking() {
+    // 460 -> 200 at 100 units/s takes 2.6 s; the time cap is 5 s.
+    let toml = shrinking(100.0, 200.0, 5.0)
+        + "\n[end_condition]\nkind = \"arena_min_reached\"\nmin_radius = 200.0\n";
+    let record = run(&toml, 1);
+
+    assert_eq!(record.end.condition, "arena_min_reached");
+    assert!(
+        (record.end.time() - 2.6).abs() <= 1.0 / 240.0,
+        "{}",
+        record.end.time()
+    );
+    assert_eq!(record.final_arena_radius, 200.0);
+}
+
+#[test]
 fn no_ball_ever_ends_a_substep_outside_the_shrinking_arena() {
     // Fast shrink down to just above the ball's size, fast ball.
     let toml = shrinking(400.0, 35.0, 3.0).replace("speed = 900.0", "speed = 5000.0");

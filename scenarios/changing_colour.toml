@@ -1,5 +1,6 @@
 # Every bounce changes colour: one ball falls under gravity and takes the
-# next palette colour on every Boundary Hit, speeding up a touch each time.
+# next palette colour on every Boundary Hit, speeding up a touch each time
+# against a little drag.
 
 name = "Changing colour"
 hook_title = "Every bounce changes its colour"
@@ -17,12 +18,22 @@ max_speed = 3500.0
 kind = "gravity"
 strength = { min = 700.0, max = 1100.0 }
 
+# A little air resistance: speeding up on each hit wins, but only just,
+# so the bounces build slowly instead of running away.
+[[rules]]
+kind = "drag"
+strength = { min = 0.01, max = 0.03 }
+
 [[rules]]
 kind = "speed_up"
-percent = { min = 2.0, max = 3.0 }
+percent = { min = 2.5, max = 3.5 }
 
 [[rules]]
 kind = "change_colour"
+
+# Every Boundary Hit plays a note.
+[[rules]]
+kind = "play_note"
 
 [end_condition]
 kind = "time_cap"
@@ -40,7 +51,7 @@ trails = true
 [quality_gate]
 min_duration = 28.0
 max_duration = 45.0
-min_boundary_hits = 40
+min_boundary_hits = 35
 
 [meta]
 title = "Every bounce changes its colour - {boundary_hits} colours later"

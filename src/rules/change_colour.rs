@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use super::{params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
-use crate::sim::{BoundaryHit, World};
+use crate::sim::{BoundaryHit, SimState};
 
 pub struct ChangeColour;
 
@@ -22,14 +22,14 @@ impl ChangeColour {
 impl Rule for ChangeColour {
     fn on_boundary_hit(
         &mut self,
-        world: &mut World,
+        state: &mut SimState,
         ball: usize,
-        _hit: &BoundaryHit,
+        _hit: &mut BoundaryHit,
         _ctx: &mut RuleContext,
     ) {
         // Render wraps the index to the palette length, so cycling through any
         // palette needs no knowledge of its size here.
-        let ball = &mut world.balls[ball];
+        let ball = &mut state.balls[ball];
         ball.colour = ball.colour.wrapping_add(1);
     }
 }

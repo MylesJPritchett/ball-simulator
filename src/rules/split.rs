@@ -16,7 +16,7 @@ use serde::Deserialize;
 
 use super::{params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
-use crate::sim::{BoundaryHit, World};
+use crate::sim::{BoundaryHit, SimState};
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -50,18 +50,18 @@ impl Split {
 impl Rule for Split {
     fn on_boundary_hit(
         &mut self,
-        world: &mut World,
+        state: &mut SimState,
         ball: usize,
-        _hit: &BoundaryHit,
+        _hit: &mut BoundaryHit,
         _ctx: &mut RuleContext,
     ) {
-        let parent = world.balls[ball].clone();
+        let parent = state.balls[ball].clone();
         let step = self.spread / (self.into - 1) as f64;
         let offset = |i: u32| -self.spread / 2.0 + step * i as f64;
-        world.balls[ball].vel = parent.vel.rotated(offset(0));
+        state.balls[ball].vel = parent.vel.rotated(offset(0));
         for i in 1..self.into {
-            let child = world.spawn(parent.pos, parent.vel.rotated(offset(i)), parent.radius);
-            world.balls[child].colour = parent.colour;
+            let child = state.spawn(parent.pos, parent.vel.rotated(offset(i)), parent.radius);
+            state.balls[child].colour = parent.colour;
         }
     }
 }

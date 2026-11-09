@@ -1,5 +1,6 @@
-//! Batch generation: N Videos from Scenarios picked at random, never the same
-//! Scenario twice in a row, each through the Quality Gate.
+//! Batch generation: N Videos from Scenarios drawn from a seeded shuffle-bag
+//! (each Scenario once per cycle, never the same one twice in a row), each
+//! through the Quality Gate.
 
 use std::path::Path;
 
@@ -43,7 +44,7 @@ pub struct BatchPlan {
 }
 
 /// Plans `count` Videos headlessly. Everything is drawn from `batch_seed`:
-/// which Scenario comes next and the first Seed tried for it, so the same
+/// the shuffle-bag order of Scenarios and the first Seed tried for each, so the same
 /// Scenarios and batch Seed always plan the same batch. A Scenario that
 /// keeps failing its Quality Gate is reported and not picked again; the plan
 /// is short only if every Scenario fails.
@@ -51,9 +52,9 @@ pub fn plan(scenarios: &[Scenario], count: usize, batch_seed: u64) -> BatchPlan 
     let mut rng = Rng::from_seed(batch_seed);
     let mut plan = BatchPlan::default();
     let mut retired = Vec::new();
-    let mut previous = None;
+    let mut bag = ShuffleBag::new(scenarios.len());
     while plan.videos.len() < count {
-        let Some(index) = pick_scenario(&mut rng, scenarios.len(), previous, &retired) else {
+        let Some(index) = bag.next(&mut rng, &retired) else {
             break;
         };
         let first_seed = rng.next_u64();
@@ -63,7 +64,6 @@ pub fn plan(scenarios: &[Scenario], count: usize, batch_seed: u64) -> BatchPlan 
                     scenario: index,
                     accepted,
                 });
-                previous = Some(index);
             }
             Err(failure) => {
                 plan.failures.push(failure);
@@ -74,23 +74,51 @@ pub fn plan(scenarios: &[Scenario], count: usize, batch_seed: u64) -> BatchPlan 
     plan
 }
 
-/// Picks the next Scenario index out of `count`, skipping `retired` ones and,
-/// when any other is left, the `previous` one.
-pub fn pick_scenario(
-    rng: &mut Rng,
+/// Seeded shuffle-bag of Scenario indices: every live Scenario comes up once
+/// per cycle, in a fresh shuffled order each cycle, and a cycle never starts
+/// with the Scenario that ended the last one (unless it is the only one left).
+#[derive(Debug, Clone)]
+pub struct ShuffleBag {
     count: usize,
+    /// What is left of the current cycle; the next pick is the last element.
+    bag: Vec<usize>,
     previous: Option<usize>,
-    retired: &[usize],
-) -> Option<usize> {
-    let live: Vec<usize> = (0..count).filter(|i| !retired.contains(i)).collect();
-    let fresh: Vec<usize> = live
-        .iter()
-        .copied()
-        .filter(|&i| Some(i) != previous)
-        .collect();
-    let candidates = if fresh.is_empty() { live } else { fresh };
-    if candidates.is_empty() {
-        return None;
+}
+
+impl ShuffleBag {
+    /// A bag over Scenario indices `0..count`.
+    pub fn new(count: usize) -> Self {
+        ShuffleBag {
+            count,
+            bag: Vec::new(),
+            previous: None,
+        }
     }
-    Some(candidates[(rng.next_u64() % candidates.len() as u64) as usize])
+
+    /// The next Scenario index, skipping `retired` ones; `None` once every
+    /// Scenario is retired.
+    pub fn next(&mut self, rng: &mut Rng, retired: &[usize]) -> Option<usize> {
+        self.bag.retain(|i| !retired.contains(i));
+        if self.bag.is_empty() {
+            self.refill(rng, retired);
+        }
+        let pick = self.bag.pop()?;
+        self.previous = Some(pick);
+        Some(pick)
+    }
+
+    fn refill(&mut self, rng: &mut Rng, retired: &[usize]) {
+        self.bag = (0..self.count).filter(|i| !retired.contains(i)).collect();
+        // Fisher-Yates, drawing only from the batch RNG.
+        for i in (1..self.bag.len()).rev() {
+            let j = (rng.next_u64() % (i as u64 + 1)) as usize;
+            self.bag.swap(i, j);
+        }
+        // No back-to-back repeat across the cycle boundary: the first pick
+        // (the last element) swaps with the start of the cycle.
+        let n = self.bag.len();
+        if n > 1 && self.bag.last().copied() == self.previous {
+            self.bag.swap(0, n - 1);
+        }
+    }
 }

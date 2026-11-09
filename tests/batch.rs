@@ -7,17 +7,11 @@ use ball_simulator::sim::rng::Rng;
 use ball_simulator::{batch, pipeline};
 use support::MINIMAL;
 
-/// Picks `n` Scenarios in a row out of `count`, none retired.
+/// Draws `n` Scenarios in a row out of `count` from a shuffle-bag, none retired.
 fn picks(count: usize, n: usize, seed: u64) -> Vec<usize> {
     let mut rng = Rng::from_seed(seed);
-    let mut previous = None;
-    (0..n)
-        .map(|_| {
-            let pick = batch::pick_scenario(&mut rng, count, previous, &[]).unwrap();
-            previous = Some(pick);
-            pick
-        })
-        .collect()
+    let mut bag = batch::ShuffleBag::new(count);
+    (0..n).map(|_| bag.next(&mut rng, &[]).unwrap()).collect()
 }
 
 #[test]
@@ -31,6 +25,19 @@ fn picks_never_repeat_a_scenario_back_to_back_but_use_them_all() {
 }
 
 #[test]
+fn cycles_come_in_different_orders() {
+    let picked = picks(4, 400, 3);
+    let mut orders: Vec<&[usize]> = picked.chunks(4).collect();
+    orders.sort();
+    orders.dedup();
+    assert!(
+        orders.len() > 5,
+        "only {} distinct cycle orders",
+        orders.len()
+    );
+}
+
+#[test]
 fn a_single_scenario_is_picked_every_time() {
     assert_eq!(picks(1, 4, 1), vec![0, 0, 0, 0]);
 }
@@ -38,13 +45,15 @@ fn a_single_scenario_is_picked_every_time() {
 #[test]
 fn retired_scenarios_are_never_picked() {
     let mut rng = Rng::from_seed(5);
+    let mut bag = batch::ShuffleBag::new(4);
     for _ in 0..50 {
-        let pick = batch::pick_scenario(&mut rng, 4, None, &[1, 3]).unwrap();
+        let pick = bag.next(&mut rng, &[1, 3]).unwrap();
         assert!(pick == 0 || pick == 2, "{pick}");
     }
-    // Only the previous Scenario is left: repeating it beats stopping.
-    assert_eq!(batch::pick_scenario(&mut rng, 3, Some(2), &[0, 1]), Some(2));
-    assert_eq!(batch::pick_scenario(&mut rng, 2, Some(0), &[0, 1]), None);
+    // Only one Scenario is left: repeating it beats stopping.
+    assert_eq!(bag.next(&mut rng, &[0, 1, 3]), Some(2));
+    assert_eq!(bag.next(&mut rng, &[0, 1, 3]), Some(2));
+    assert_eq!(bag.next(&mut rng, &[0, 1, 2, 3]), None);
 }
 
 fn named(id: &str, extra: &str) -> Scenario {
@@ -77,6 +86,30 @@ fn a_batch_plans_count_videos_alternating_scenarios_through_the_quality_gate() {
     assert!(order.windows(2).all(|w| w[0] != w[1]), "{order:?}");
     for video in &plan.videos {
         assert!(video.accepted.record.quality_gate.is_accepted());
+    }
+}
+
+#[test]
+fn a_batch_uses_every_scenario_once_per_cycle_without_back_to_back_repeats() {
+    let scenarios = [
+        named("a", ""),
+        named("b", ""),
+        named("c", ""),
+        named("d", ""),
+    ];
+    for batch_seed in 0..10 {
+        let plan = batch::plan(&scenarios, 20, batch_seed);
+        let order: Vec<usize> = plan.videos.iter().map(|v| v.scenario).collect();
+
+        for cycle in order.chunks(4) {
+            let mut sorted = cycle.to_vec();
+            sorted.sort();
+            assert_eq!(sorted, vec![0, 1, 2, 3], "batch {batch_seed}: {order:?}");
+        }
+        assert!(
+            order.windows(2).all(|w| w[0] != w[1]),
+            "batch {batch_seed}: {order:?}"
+        );
     }
 }
 

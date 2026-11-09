@@ -9,7 +9,7 @@
 
 name = "The Arena is shrinking"
 hook_title = "The Arena is shrinking"
-time_cap = { min = 36.0, max = 42.0 }
+time_cap = 60.0
 
 [arena]
 radius = 460.0
@@ -26,8 +26,14 @@ min_radius = 280.0                # stops shrinking here
 [[rules]]
 kind = "change_colour"
 
+# Every Boundary Hit plays a note.
+[[rules]]
+kind = "play_note"
+
+# The payoff: the Boundary stops closing in.
 [end_condition]
-kind = "time_cap"
+kind = "arena_min_reached"
+min_radius = 280.0
 
 # Seeds outside these are rejected and replaced. Durations are Video length
 # in seconds (action plus the ~1.5 s ending hold).

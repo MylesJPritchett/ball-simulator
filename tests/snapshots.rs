@@ -91,11 +91,11 @@ fn changing_colour_seed_1() {
     assert_seed_1(
         "changing_colour",
         Snapshot {
-            boundary_hits: 80,
+            boundary_hits: 51,
             final_ball_count: 1,
             end_condition: "time_cap",
-            end_substep: 16786,
-            final_state_hash: 5255913662098287887,
+            end_substep: 14129,
+            final_state_hash: 5589162356901613303,
         },
     );
 }
@@ -105,11 +105,11 @@ fn closing_in_seed_1() {
     assert_seed_1(
         "closing_in",
         Snapshot {
-            boundary_hits: 84,
+            boundary_hits: 94,
             final_ball_count: 1,
             end_condition: "arena_filled",
-            end_substep: 16016,
-            final_state_hash: 14414972202662410175,
+            end_substep: 13851,
+            final_state_hash: 5573714443546182967,
         },
     );
 }
@@ -133,11 +133,11 @@ fn faster_every_bounce_seed_1() {
     assert_seed_1(
         "faster_every_bounce",
         Snapshot {
-            boundary_hits: 121,
+            boundary_hits: 62,
             final_ball_count: 1,
-            end_condition: "time_cap",
-            end_substep: 16747,
-            final_state_hash: 7406598717257124148,
+            end_condition: "max_speed_reached",
+            end_substep: 14852,
+            final_state_hash: 2899949589808386359,
         },
     );
 }
@@ -147,11 +147,11 @@ fn gravity_split_seed_1() {
     assert_seed_1(
         "gravity_split",
         Snapshot {
-            boundary_hits: 1501,
+            boundary_hits: 1499,
             final_ball_count: 1500,
             end_condition: "population_cap",
-            end_substep: 16526,
-            final_state_hash: 17657103179337597194,
+            end_substep: 18384,
+            final_state_hash: 8991188671581940454,
         },
     );
 }
@@ -175,11 +175,11 @@ fn shrinking_seed_1() {
     assert_seed_1(
         "shrinking",
         Snapshot {
-            boundary_hits: 98,
+            boundary_hits: 84,
             final_ball_count: 1,
-            end_condition: "time_cap",
-            end_substep: 17746,
-            final_state_hash: 13495442815248080,
+            end_condition: "min_radius_reached",
+            end_substep: 15691,
+            final_state_hash: 16786892219519152768,
         },
     );
 }
@@ -189,11 +189,11 @@ fn shrinking_arena_seed_1() {
     assert_seed_1(
         "shrinking_arena",
         Snapshot {
-            boundary_hits: 90,
+            boundary_hits: 94,
             final_ball_count: 1,
-            end_condition: "time_cap",
-            end_substep: 18933,
-            final_state_hash: 7422997877164674145,
+            end_condition: "arena_min_reached",
+            end_substep: 17210,
+            final_state_hash: 15629819146900822048,
         },
     );
 }

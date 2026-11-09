@@ -55,7 +55,13 @@ fn main() -> ExitCode {
             out,
         } => Scenario::from_file(&resolve_scenario_path(&scenario))
             .map_err(Into::into)
-            .and_then(|s| pipeline::generate(&s, seed, &out).map_err(Into::into)),
+            .and_then(|s| pipeline::generate(&s, seed, &out).map_err(Into::into))
+            .map(|generated| {
+                for r in &generated.rejected {
+                    eprintln!("Seed {} rejected by the Quality Gate: {}", r.seed, r.reason);
+                }
+                generated.dir
+            }),
         Command::Preview { scenario, seed } => {
             return match preview::window::run(resolve_scenario_path(&scenario), seed) {
                 Ok(()) => ExitCode::SUCCESS,

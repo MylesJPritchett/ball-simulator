@@ -22,3 +22,10 @@ spread = 12.0
 
 [end_condition]
 kind = "population_cap"
+
+# Seeds outside these are rejected and replaced. Durations are Video length
+# in seconds (action plus the ~1.5 s ending hold).
+[quality_gate]
+min_duration = 18.0
+max_duration = 45.0
+min_boundary_hits = 1000

@@ -27,6 +27,26 @@ fn every_shipped_scenario_is_valid() {
 }
 
 #[test]
+fn every_shipped_scenario_sets_quality_gate_thresholds_its_snapshot_seed_passes() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("scenarios");
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|e| e == "toml") {
+            let scenario = Scenario::from_file(&path).unwrap();
+            let gate = &scenario.quality_gate;
+            assert!(
+                gate.min_duration > 0.0 && gate.max_duration.is_finite(),
+                "{} needs a [quality_gate] duration range",
+                path.display()
+            );
+            assert!(gate.min_boundary_hits > 0, "{}", path.display());
+            let verdict = sim::run(&scenario, 1).quality_gate;
+            assert!(verdict.is_accepted(), "{}: {verdict:?}", path.display());
+        }
+    }
+}
+
+#[test]
 fn minimal_seed_1() {
     let record = sim::run(&shipped("minimal"), 1);
 

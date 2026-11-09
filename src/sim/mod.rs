@@ -7,11 +7,13 @@
 
 pub mod end_condition;
 pub mod ending;
+pub mod quality_gate;
 pub mod record;
 pub mod rng;
 mod world;
 
 pub use ending::Ending;
+pub use quality_gate::{Rejection, Verdict};
 pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
 pub use world::{Arena, Ball, Vec2, World};
 
@@ -247,7 +249,7 @@ impl Simulation {
     /// Finishes the run. Call once [`Simulation::is_ended`] is true.
     pub fn into_record(self) -> SimRecord {
         let end = self.end.expect("into_record called before the run ended");
-        SimRecord {
+        let mut record = SimRecord {
             seed: self.seed,
             parameters: self.parameters,
             palette: self.palette.name.to_string(),
@@ -259,7 +261,10 @@ impl Simulation {
             end,
             stats: self.stats,
             final_balls: self.world.balls,
-        }
+            quality_gate: Verdict::Accepted,
+        };
+        record.quality_gate = quality_gate::judge(&self.scenario, &record);
+        record
     }
 }
 

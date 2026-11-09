@@ -132,6 +132,15 @@ pub fn generate(
     out_root: &Path,
 ) -> Result<Generated, GenerateError> {
     let accepted = pick_seed(scenario, seeds_from(seed))?;
+    render_accepted(scenario, accepted, out_root)
+}
+
+/// Renders the Video for a Seed the Quality Gate already accepted.
+pub fn render_accepted(
+    scenario: &Scenario,
+    accepted: AcceptedSeed,
+    out_root: &Path,
+) -> Result<Generated, GenerateError> {
     let dir = render(scenario, &accepted.record, out_root)?;
     Ok(Generated {
         dir,

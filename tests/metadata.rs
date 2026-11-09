@@ -31,7 +31,10 @@ hashtags = ["bounce{population_cap}", "satisfying"]
     let meta = VideoMeta::new(&scenario, &record);
 
     let speed = meta.parameters["ball.speed"].as_f64();
-    assert!((600.0..=1200.0).contains(&speed) && speed != 600.0, "{speed}");
+    assert!(
+        (600.0..=1200.0).contains(&speed) && speed != 600.0,
+        "{speed}"
+    );
     assert_eq!(meta.title, format!("Can it reach 50? {speed} px/s"));
     // 5 s of action plus the 1.5 s ending hold, rounded.
     assert_eq!(
@@ -59,7 +62,9 @@ fn a_scenario_with_an_unknown_placeholder_is_invalid() {
     let toml = format!(
         "{MINIMAL}\n[end_condition]\nkind = \"time_cap\"\n[meta]\ntitle = \"Reach {{cap_typo}}\"\n"
     );
-    let err = Scenario::from_toml_str("typo", &toml).unwrap_err().to_string();
+    let err = Scenario::from_toml_str("typo", &toml)
+        .unwrap_err()
+        .to_string();
 
     assert!(err.contains("meta.title"), "{err}");
     assert!(err.contains("{cap_typo}"), "{err}");
@@ -79,7 +84,10 @@ fn hashtags_put_scenario_tags_first_then_the_shared_pool_without_duplicates() {
         &["satisfying", "#shorts", "physics"],
     );
 
-    assert_eq!(merged, vec!["#doubling", "#Satisfying", "#physics", "#shorts"]);
+    assert_eq!(
+        merged,
+        vec!["#doubling", "#Satisfying", "#physics", "#shorts"]
+    );
 }
 
 #[test]
@@ -116,6 +124,24 @@ fn unknown_or_unclosed_placeholders_are_errors_naming_the_problem() {
 
     let unknown = unknown.unwrap_err();
     assert!(unknown.contains("{cap}"), "{unknown}");
-    assert!(unknown.contains("population_cap"), "lists known names: {unknown}");
+    assert!(
+        unknown.contains("population_cap"),
+        "lists known names: {unknown}"
+    );
     assert!(unclosed.unwrap_err().contains("unclosed"));
+}
+
+#[test]
+fn shipped_doubling_metadata_names_its_population_cap() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("scenarios/doubling.toml");
+    let scenario = Scenario::from_file(&path).unwrap();
+    let meta = VideoMeta::new(&scenario, &sim::run(&scenario, 1));
+
+    assert_eq!(meta.title, "Every bounce it doubles - can it reach 2000?");
+    assert!(
+        meta.description.contains("until there are 2000."),
+        "{}",
+        meta.description
+    );
+    assert_eq!(meta.hashtags[0], "#doubling");
 }

@@ -29,3 +29,8 @@ kind = "population_cap"
 min_duration = 18.0
 max_duration = 45.0
 min_boundary_hits = 1000
+
+[meta]
+title = "Every bounce it doubles - can it reach {population_cap}?"
+description = "One ball splits in two on every Boundary Hit until there are {balls}. {boundary_hits} bounces, one note each."
+hashtags = ["doubling", "exponential", "split"]

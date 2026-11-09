@@ -145,7 +145,9 @@ pub fn interpolate(template: &str, vars: &BTreeMap<String, String>) -> Result<St
             out.push_str(brace);
             rest = &after[1..];
         } else if brace == "}" {
-            return Err(format!("unmatched '}}' in \"{template}\" (write '}}}}' for a brace)"));
+            return Err(format!(
+                "unmatched '}}' in \"{template}\" (write '}}}}' for a brace)"
+            ));
         } else {
             let Some(end) = after.find('}') else {
                 return Err(format!("unclosed '{{' in \"{template}\""));

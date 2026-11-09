@@ -9,11 +9,13 @@
 
 mod range;
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use serde::Deserialize;
 
 use crate::look::LookSpec;
+use crate::meta::MetaSpec;
 use crate::sim::rng::Rng;
 use range::Pick;
 pub use range::{ParamValue, ResolvedParam};
@@ -60,6 +62,8 @@ pub struct Scenario {
     file: String,
     /// Palette, visual toggles and Counter (`[look]`, optional).
     pub look: LookSpec,
+    /// Title, description and hashtag templates (`[meta]`, optional).
+    pub meta: MetaSpec,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -134,6 +138,8 @@ struct ScenarioFile {
     quality_gate: QualityGateSpec,
     #[serde(default)]
     look: LookSpec,
+    #[serde(default)]
+    meta: MetaSpec,
 }
 
 impl Scenario {
@@ -208,6 +214,7 @@ impl Scenario {
             end_condition: Some(end_condition),
             quality_gate: file_data.quality_gate,
             look: file_data.look,
+            meta: file_data.meta,
             template: table,
             file: file.to_string(),
         })
@@ -229,6 +236,17 @@ impl Scenario {
         )
         .expect("ranges were validated at both ends");
         (resolved, params)
+    }
+
+    /// Every scalar value in the file by its path (`ball.speed`,
+    /// `rules[1].percent`), plus `hook_title`; on a resolved Scenario these are
+    /// the Seed's values. Metadata templates are filled in from these.
+    pub fn values(&self) -> BTreeMap<String, String> {
+        let mut out = BTreeMap::new();
+        flatten("", &toml::Value::Table(self.template.clone()), &mut out);
+        out.retain(|k, _| !k.starts_with("meta."));
+        out.insert("hook_title".into(), self.hook_title.clone());
+        out
     }
 
     fn invalid(&self, message: impl Into<String>) -> ScenarioError {
@@ -254,6 +272,7 @@ impl Scenario {
             );
         }
         self.look.validate().map_err(|m| self.invalid(m))?;
+        crate::meta::check_templates(self).map_err(|m| self.invalid(m))?;
         if !(self.ball.max_speed.is_finite() && self.ball.max_speed > 0.0) {
             return Err(self.invalid("ball.max_speed must be a finite number greater than 0"));
         }
@@ -276,6 +295,34 @@ impl Scenario {
             .map_err(|m| self.invalid(format!("end_condition: {m}")))?;
         Ok(())
     }
+}
+
+fn flatten(path: &str, value: &toml::Value, out: &mut BTreeMap<String, String>) {
+    let text = match value {
+        toml::Value::Table(table) => {
+            for (key, v) in table {
+                let path = if path.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{path}.{key}")
+                };
+                flatten(&path, v, out);
+            }
+            return;
+        }
+        toml::Value::Array(items) => {
+            for (i, v) in items.iter().enumerate() {
+                flatten(&format!("{path}[{i}]"), v, out);
+            }
+            return;
+        }
+        toml::Value::String(s) => s.clone(),
+        toml::Value::Integer(i) => i.to_string(),
+        toml::Value::Float(f) => crate::meta::format_number(*f),
+        toml::Value::Boolean(b) => b.to_string(),
+        toml::Value::Datetime(d) => d.to_string(),
+    };
+    out.insert(path.to_string(), text);
 }
 
 /// Prefixes a deserialization error with the field it happened at.

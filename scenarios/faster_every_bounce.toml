@@ -3,7 +3,7 @@
 
 name = "Faster every bounce"
 hook_title = "It gets faster every bounce"
-time_cap = { min = 28.0, max = 40.0 }
+time_cap = 60.0
 
 [arena]
 radius = 460.0
@@ -15,7 +15,7 @@ max_speed = 4000.0
 
 [[rules]]
 kind = "speed_up"
-percent = { min = 3.0, max = 5.0 }
+percent = { min = 2.0, max = 3.0 }
 
 [[rules]]
 kind = "change_colour"
@@ -24,8 +24,9 @@ kind = "change_colour"
 [[rules]]
 kind = "play_note"
 
+# The payoff: it hits the max speed.
 [end_condition]
-kind = "time_cap"
+kind = "max_speed_reached"
 
 [look]
 counter = "speed"

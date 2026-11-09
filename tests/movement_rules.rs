@@ -93,6 +93,18 @@ fn speed_up_never_exceeds_max_speed() {
 }
 
 #[test]
+fn max_speed_reached_ends_on_the_hit_that_brings_a_ball_to_max_speed() {
+    let toml = speed_up(1500.0).replace("time_cap = 5.0", "time_cap = 60.0")
+        + "\n[end_condition]\nkind = \"max_speed_reached\"\n";
+    let record = run(&toml, 7);
+
+    assert_eq!(record.end.condition, "max_speed_reached");
+    // 900 * 1.1^5 = 1449 < 1500 <= 900 * 1.1^6: the 6th hit reaches it.
+    assert_eq!(record.boundary_hits.len(), 6);
+    assert_eq!(record.boundary_hits[5].substep, record.end.substep);
+}
+
+#[test]
 fn gravity_cannot_push_a_ball_past_max_speed() {
     let toml = MINIMAL.replace("speed = 900.0", "speed = 900.0\nmax_speed = 1000.0")
         + "\n[[rules]]\nkind = \"gravity\"\nstrength = 5000.0\n";

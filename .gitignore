@@ -1,1 +1,7 @@
 .aider*
+/target
+/output
+/result
+.direnv/
+*.mp4
+*.wav

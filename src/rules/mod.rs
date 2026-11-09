@@ -3,7 +3,7 @@
 //! Adding a Rule:
 //! 1. Create `src/rules/<name>.rs` with a type implementing [`Rule`] and a
 //!    `from_spec(&RuleSpec) -> Result<Self, String>` constructor (use [`params`]).
-//! 2. Add one `mod` line and one match arm in [`build`].
+//! 2. Add one `mod` line, a kind const and one match arm in [`build`].
 //!
 //! Rules must be deterministic: any randomness comes from `ctx.rng`, never from
 //! the clock, a thread RNG or hash-map iteration order.
@@ -23,6 +23,17 @@ use serde::de::DeserializeOwned;
 use crate::scenario::{RuleSpec, Scenario};
 use crate::sim::rng::Rng;
 use crate::sim::{BoundaryHit, SimState};
+
+/// Rule kinds, as written in Scenario files (`kind = "..."`).
+pub const GRAVITY: &str = "gravity";
+pub const DRAG: &str = "drag";
+pub const SPEED_UP: &str = "speed_up";
+pub const CHANGE_COLOUR: &str = "change_colour";
+pub const SHRINKING_ARENA: &str = "shrinking_arena";
+pub const SPLIT: &str = "split";
+pub const GROW: &str = "grow";
+pub const SHRINK: &str = "shrink";
+pub const PLAY_NOTE: &str = "play_note";
 
 /// Per-call context handed to Rules by the simulation.
 pub struct RuleContext<'a> {
@@ -59,15 +70,15 @@ pub trait Rule {
 /// Builds one Rule from its Scenario entry.
 pub fn build(spec: &RuleSpec) -> Result<Box<dyn Rule>, String> {
     match spec.kind.as_str() {
-        "gravity" => Ok(Box::new(gravity::Gravity::from_spec(spec)?)),
-        "drag" => Ok(Box::new(drag::Drag::from_spec(spec)?)),
-        "speed_up" => Ok(Box::new(speed_up::SpeedUp::from_spec(spec)?)),
-        "change_colour" => Ok(Box::new(change_colour::ChangeColour::from_spec(spec)?)),
-        "shrinking_arena" => Ok(Box::new(shrinking_arena::ShrinkingArena::from_spec(spec)?)),
-        "split" => Ok(Box::new(split::Split::from_spec(spec)?)),
-        "grow" => Ok(Box::new(grow::Grow::from_spec(spec)?)),
-        "shrink" => Ok(Box::new(shrink::Shrink::from_spec(spec)?)),
-        "play_note" => Ok(Box::new(play_note::PlayNote::from_spec(spec)?)),
+        GRAVITY => Ok(Box::new(gravity::Gravity::from_spec(spec)?)),
+        DRAG => Ok(Box::new(drag::Drag::from_spec(spec)?)),
+        SPEED_UP => Ok(Box::new(speed_up::SpeedUp::from_spec(spec)?)),
+        CHANGE_COLOUR => Ok(Box::new(change_colour::ChangeColour::from_spec(spec)?)),
+        SHRINKING_ARENA => Ok(Box::new(shrinking_arena::ShrinkingArena::from_spec(spec)?)),
+        SPLIT => Ok(Box::new(split::Split::from_spec(spec)?)),
+        GROW => Ok(Box::new(grow::Grow::from_spec(spec)?)),
+        SHRINK => Ok(Box::new(shrink::Shrink::from_spec(spec)?)),
+        PLAY_NOTE => Ok(Box::new(play_note::PlayNote::from_spec(spec)?)),
         other => Err(format!("unknown Rule '{other}'")),
     }
 }

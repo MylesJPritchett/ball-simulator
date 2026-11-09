@@ -23,6 +23,9 @@ pub struct SimRecord {
     /// Which End Condition fired and when.
     pub end: EndEvent,
     pub stats: SimStats,
+    /// Arena radius when the run ended (differs from the Scenario's if a Rule
+    /// changed it, e.g. shrinking_arena).
+    pub final_arena_radius: f64,
     /// Hash of the final simulation state; changes if behaviour changes at all.
     pub final_state_hash: u64,
 }
@@ -36,6 +39,10 @@ pub struct BoundaryHit {
     pub angle: f64,
     /// Pitch assigned to this hit's note, in Hz.
     pub pitch: f64,
+    /// The ball's speed at impact (before on-hit Rules), in units per second.
+    pub speed: f64,
+    /// The ball's palette colour index after on-hit Rules ran.
+    pub colour: u32,
 }
 
 impl BoundaryHit {
@@ -70,4 +77,6 @@ pub struct SimStats {
     /// Largest distance any ball's edge was outside the Boundary at the end of a
     /// substep (0 if never).
     pub max_boundary_overshoot: f64,
+    /// Highest ball speed at the end of any substep, in units per second.
+    pub max_speed: f64,
 }

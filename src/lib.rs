@@ -10,6 +10,7 @@ pub mod encode;
 pub mod look;
 pub mod meta;
 pub mod pipeline;
+pub mod preview;
 pub mod render;
 pub mod rules;
 pub mod scenario;

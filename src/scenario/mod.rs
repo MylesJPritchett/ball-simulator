@@ -55,6 +55,16 @@ pub struct BallSpec {
     pub radius: f64,
     /// Initial speed in simulation units per second.
     pub speed: f64,
+    /// Speed limit in units per second, always enforced on every ball.
+    #[serde(default = "default_max_speed")]
+    pub max_speed: f64,
+}
+
+/// Max speed for Scenarios that don't set one.
+pub const DEFAULT_MAX_SPEED: f64 = 5000.0;
+
+fn default_max_speed() -> f64 {
+    DEFAULT_MAX_SPEED
 }
 
 /// A `kind` plus free-form parameters. Used for both Rules and End Conditions.
@@ -133,6 +143,9 @@ impl Scenario {
             );
         }
         self.look.validate().map_err(|m| self.invalid(m))?;
+        if !(self.ball.max_speed.is_finite() && self.ball.max_speed > 0.0) {
+            return Err(self.invalid("ball.max_speed must be a finite number greater than 0"));
+        }
         // Building Rules and End Conditions validates their kinds and parameters.
         crate::rules::build_all(self).map_err(|m| self.invalid(m))?;
         crate::sim::end_condition::build(self).map_err(|m| self.invalid(m))?;

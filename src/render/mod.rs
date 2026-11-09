@@ -61,9 +61,9 @@ fn mix(colour: Rgb, background: Rgb, t: f32) -> Rgb {
     ]
 }
 
-/// The palette colour slot a ball is drawn in.
+/// The palette colour slot a ball is drawn in (wrapped by [`Palette::ball`]).
 fn ball_slot(ball: &Ball) -> usize {
-    ball.id as usize
+    ball.colour as usize
 }
 
 pub struct Renderer {
@@ -135,6 +135,11 @@ impl Renderer {
         self.draw_balls(sim, palette);
         self.draw_text(sim, palette);
 
+        self.frame()
+    }
+
+    /// The most recently drawn frame as RGBA bytes (blank before the first draw).
+    pub fn frame(&self) -> &[u8] {
         self.pixmap.data()
     }
 

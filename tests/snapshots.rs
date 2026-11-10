@@ -147,11 +147,11 @@ fn gravity_split_seed_1() {
     assert_seed_1(
         "gravity_split",
         Snapshot {
-            boundary_hits: 1499,
-            final_ball_count: 1500,
-            end_condition: "population_cap",
-            end_substep: 18384,
-            final_state_hash: 8991188671581940454,
+            boundary_hits: 3588,
+            final_ball_count: 3589,
+            end_condition: "arena_covered",
+            end_substep: 15453,
+            final_state_hash: 10685790574810927004,
         },
     );
 }

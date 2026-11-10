@@ -133,11 +133,11 @@ fn faster_every_bounce_seed_1() {
     assert_seed_1(
         "faster_every_bounce",
         Snapshot {
-            boundary_hits: 62,
+            boundary_hits: 63,
             final_ball_count: 1,
-            end_condition: "max_speed_reached",
-            end_substep: 14852,
-            final_state_hash: 2899949589808386359,
+            end_condition: "escaped",
+            end_substep: 14962,
+            final_state_hash: 2039006523067366090,
         },
     );
 }

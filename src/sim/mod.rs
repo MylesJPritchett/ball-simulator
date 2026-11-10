@@ -15,7 +15,7 @@ mod state;
 pub use ending::{Effect, Ending, EndingStyle, PlayOut};
 pub use quality_gate::{Rejection, Verdict};
 pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
-pub use state::{Arena, Ball, Gap, SimState, Vec2};
+pub use state::{Arena, Ball, Crack, Gap, Shatter, SimState, Vec2};
 
 use crate::audio::music::Sound;
 use crate::look::{palette, Palette};
@@ -94,6 +94,7 @@ impl Simulation {
             rng: &mut rng,
             substep: 0,
             dt: 1.0 / SUBSTEP_HZ as f64,
+            max_speed: ball.max_speed,
         };
         for rule in &mut rules {
             rule.on_start(&mut state, &mut ctx);
@@ -202,6 +203,7 @@ impl Simulation {
             rng: &mut self.rng,
             substep: self.substep,
             dt,
+            max_speed: self.max_speed,
         };
         let radius_before = self.state.arena.radius;
         for rule in &mut self.rules {

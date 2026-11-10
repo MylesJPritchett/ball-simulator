@@ -82,6 +82,25 @@ fn changing_colour_ends_when_its_ball_escapes_through_a_gap() {
 }
 
 #[test]
+fn faster_every_bounce_ends_when_its_ball_breaks_out() {
+    let (_, scenario) = shipped()
+        .into_iter()
+        .find(|(_, s)| s.id == "faster_every_bounce")
+        .expect("faster_every_bounce ships");
+
+    assert!(scenario.rules.iter().any(|rule| rule.kind == "crack"));
+    assert_eq!(scenario.end_condition.kind, "escaped");
+    assert!(
+        scenario.hook_title.contains("breaks out"),
+        "{}",
+        scenario.hook_title
+    );
+    let record = sim::run(&scenario, 1);
+    assert_eq!(record.end.condition, "escaped");
+    assert!(record.final_balls[0].escaping);
+}
+
+#[test]
 fn every_shipped_scenario_has_metadata_templates() {
     for (path, scenario) in shipped() {
         let meta = &scenario.meta;

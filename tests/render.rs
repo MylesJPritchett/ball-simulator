@@ -3,6 +3,8 @@
 
 mod support;
 
+use std::f64::consts::PI;
+
 use ball_simulator::render::{layout, Renderer};
 use ball_simulator::sim::{self, Effect, Ending, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
 use support::{scenario, MINIMAL};
@@ -418,4 +420,133 @@ fn the_boundary_is_drawn_with_the_gap_missing_and_the_gap_turns() {
         on_boundary(&last, start + 90f64.to_radians()),
         palette.background
     );
+}
+
+/// MINIMAL speeding up 10% a hit to `max_speed`, cracking the Boundary and
+/// ending on `escaped`, with trails and glows off.
+fn cracking(max_speed: f64) -> String {
+    MINIMAL.replace(
+        "speed = 900.0",
+        &format!("speed = 900.0\nmax_speed = {max_speed:?}"),
+    ) + "\n[[rules]]\nkind = \"speed_up\"\npercent = 10.0\n\
+           \n[[rules]]\nkind = \"crack\"\n\
+           \n[end_condition]\nkind = \"escaped\"\n\
+           \n[look]\ntrails = false\nglow = false\n"
+}
+
+/// Pixels drawn (not background) in the Arena's rim within `width` degrees
+/// of `angle`, from just inside the Boundary's anti-aliased edge up to 200 px
+/// in, leaving out the ball.
+fn drawn_in_rim(sim: &Simulation, frame: &[u8], angle: f64, width: f64) -> usize {
+    let arena = layout::arena();
+    let scale = arena.radius / 460.0;
+    let ball = &sim.state().balls[0];
+    let (bx, by) = (
+        arena.center_x + ball.pos.x as f32 * scale,
+        arena.center_y + ball.pos.y as f32 * scale,
+    );
+    let ball_r = ball.radius as f32 * scale + 3.0;
+    let background = sim.palette().background;
+    let mut drawn = 0;
+    for step in 0..=(width * 10.0) as i32 {
+        let a = angle + (step as f64 / 10.0 - width / 2.0).to_radians();
+        let (sin, cos) = (a as f32).sin_cos();
+        for d in 3..200 {
+            let r = arena.radius - d as f32;
+            let (x, y) = (arena.center_x + cos * r, arena.center_y + sin * r);
+            if (x - bx).hypot(y - by) > ball_r && pixel(frame, x, y) != background {
+                drawn += 1;
+            }
+        }
+    }
+    drawn
+}
+
+#[test]
+fn a_crack_appears_where_the_ball_hits_and_is_bigger_the_faster_it_hit() {
+    // The first hit is at 900 units/s: 90% of a 1000 max speed, 10% of 9000.
+    let first_hit = sim::run(&scenario(&cracking(9000.0)), 1).boundary_hits[0].clone();
+    let hit_frame = first_hit.substep.div_ceil(SUBSTEPS_PER_FRAME);
+    // A third of a second on, the ball is well clear of the crack.
+    let later = hit_frame + 20;
+    let crack_at = |max_speed: f64| {
+        let (mut before, mut after, mut opposite) = (usize::MAX, 0, usize::MAX);
+        let mut k = 0;
+        draw_frames(&cracking(max_speed), 1, later + 1, |sim, frame| {
+            if k + 1 == hit_frame {
+                before = drawn_in_rim(sim, frame, first_hit.angle, 30.0);
+            }
+            if k == later {
+                after = drawn_in_rim(sim, frame, first_hit.angle, 30.0);
+                opposite = drawn_in_rim(sim, frame, first_hit.angle + PI, 30.0);
+            }
+            k += 1;
+        });
+        (before, after, opposite)
+    };
+    let (small_before, small, small_opposite) = crack_at(9000.0);
+    let (big_before, big, big_opposite) = crack_at(1000.0);
+
+    assert_eq!(
+        (small_before, big_before),
+        (0, 0),
+        "no crack before the hit"
+    );
+    assert_eq!(
+        (small_opposite, big_opposite),
+        (0, 0),
+        "nothing across the Arena"
+    );
+    assert!(small > 0, "a slow hit still cracks the Boundary");
+    assert!(big > small * 3, "big {big} vs small {small}");
+}
+
+#[test]
+fn the_boundary_is_drawn_shattered_once_the_ball_breaks_out() {
+    let toml = cracking(1500.0);
+    let record = sim::run(&scenario(&toml), 1);
+    assert_eq!(record.end.condition, "escaped");
+    let shatter_frame = record
+        .boundary_hits
+        .last()
+        .unwrap()
+        .substep
+        .div_ceil(SUBSTEPS_PER_FRAME);
+    let arena = layout::arena();
+    // Points on a circle `r` px from the Arena's centre drawn in `colour`.
+    let on_circle = |frame: &[u8], r: f32, colour: [u8; 3]| {
+        (0..720)
+            .filter(|&step| {
+                let (sin, cos) = (step as f32 / 2.0).to_radians().sin_cos();
+                pixel(frame, arena.center_x + cos * r, arena.center_y + sin * r) == colour
+            })
+            .count()
+    };
+    let ring = arena.radius + BOUNDARY_WIDTH / 2.0;
+    let (mut k, mut checked) = (0, 0);
+    // No flash, which would tint the shards.
+    let no_flash = |ending: Ending| Ending {
+        flash_substeps: 0,
+        ..ending
+    };
+    draw_frames_with(&toml, 1, record.ending.frames(), no_flash, |sim, frame| {
+        let boundary = sim.palette().boundary;
+        if k + 1 == shatter_frame {
+            assert_eq!(on_circle(frame, ring, boundary), 720, "whole before");
+        }
+        // From a tenth of a second after the shatter to the cut, the
+        // Boundary is in shards flying outward.
+        if k >= shatter_frame + 6 {
+            let on_ring = on_circle(frame, ring, boundary);
+            assert!(on_ring < 720 / 4, "frame {k}: {on_ring} of the ring left");
+            let shards: usize = (1..120)
+                .step_by(4)
+                .map(|d| on_circle(frame, ring + d as f32, boundary))
+                .sum();
+            assert!(shards > 200, "frame {k}: {shards} shard pixels");
+            checked += 1;
+        }
+        k += 1;
+    });
+    assert!(checked > 60, "{checked} frames checked");
 }

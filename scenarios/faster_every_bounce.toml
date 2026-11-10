@@ -1,8 +1,10 @@
-# One ball that gets faster and changes colour on every Boundary Hit,
-# up to the max speed. The Counter shows its speed.
+# One ball that gets faster and changes colour on every Boundary Hit, and
+# cracks the Boundary harder the faster it hits, until the first hit at max
+# speed shatters it and the ball breaks out. The Counter shows its speed.
 
 name = "Faster every bounce"
-hook_title = "It gets faster every bounce"
+hook_title = "It gets faster every bounce — until it breaks out"
+# Safety net only: every ball reaches max speed long before this.
 time_cap = 60.0
 
 [arena]
@@ -11,6 +13,8 @@ radius = 460.0
 [ball]
 radius = 30.0
 speed = { min = 750.0, max = 900.0 }
+# Cracks grow with speed as a fraction of this, and a hit at it shatters
+# the Boundary.
 max_speed = 4000.0
 
 [[rules]]
@@ -24,21 +28,25 @@ kind = "change_colour"
 [[rules]]
 kind = "play_note"
 
-# The payoff: it hits the max speed.
+[[rules]]
+kind = "crack"
+
+# The Terminal State: the ball has broken out of the shattered Arena, and
+# the Video holds once it has left the frame.
 [end_condition]
-kind = "max_speed_reached"
+kind = "escaped"
 
 [look]
 counter = "speed"
 
 # Seeds outside these are rejected and replaced. Durations are Video length
-# in seconds (action plus the ~1.5 s ending hold).
+# in seconds (action, the ball leaving the frame and the ~1.5 s hold).
 [quality_gate]
 min_duration = 25.0
 max_duration = 45.0
 min_boundary_hits = 50
 
 [meta]
-title = "It gets {rules[0].percent}% faster every bounce"
-description = "Every Boundary Hit speeds the ball up by {rules[0].percent}% and changes its colour. {boundary_hits} bounces in {duration} seconds."
-hashtags = ["speed", "faster", "acceleration"]
+title = "It gets {rules[0].percent}% faster every bounce - until it breaks out"
+description = "Every Boundary Hit speeds the ball up by {rules[0].percent}%, changes its colour and cracks the Boundary. {boundary_hits} bounces in {duration} seconds, then it shatters."
+hashtags = ["speed", "faster", "acceleration", "breakout"]

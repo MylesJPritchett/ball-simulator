@@ -9,6 +9,7 @@
 //! the clock, a thread RNG or hash-map iteration order.
 
 mod change_colour;
+mod crack;
 mod drag;
 mod gap;
 mod gravity;
@@ -36,6 +37,7 @@ pub const GROW: &str = "grow";
 pub const SHRINK: &str = "shrink";
 pub const PLAY_NOTE: &str = "play_note";
 pub const GAP: &str = "gap";
+pub const CRACK: &str = "crack";
 
 /// Per-call context handed to Rules by the simulation.
 pub struct RuleContext<'a> {
@@ -45,6 +47,8 @@ pub struct RuleContext<'a> {
     pub substep: u64,
     /// Substep duration in seconds.
     pub dt: f64,
+    /// The Scenario's max speed (units per second).
+    pub max_speed: f64,
 }
 
 /// One Rule's hooks into the simulation. All hooks default to doing nothing.
@@ -58,6 +62,13 @@ pub trait Rule {
     /// Boundary (adding to `state.arena.gaps`) or marking a ball `escaping`.
     /// The `escaped` End Condition needs at least one such Rule.
     fn lets_balls_out(&self) -> bool {
+        false
+    }
+
+    /// Whether this Rule works relative to the Scenario's max speed (see
+    /// `RuleContext::max_speed`), so the Scenario must set `ball.max_speed`
+    /// rather than take the default.
+    fn needs_max_speed(&self) -> bool {
         false
     }
 
@@ -95,6 +106,7 @@ pub fn build(spec: &RuleSpec) -> Result<Box<dyn Rule>, String> {
         SHRINK => Ok(Box::new(shrink::Shrink::from_spec(spec)?)),
         PLAY_NOTE => Ok(Box::new(play_note::PlayNote::from_spec(spec)?)),
         GAP => Ok(Box::new(gap::Gap::from_spec(spec)?)),
+        CRACK => Ok(Box::new(crack::Crack::from_spec(spec)?)),
         other => Err(format!("unknown Rule '{other}'")),
     }
 }

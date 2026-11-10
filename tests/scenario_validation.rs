@@ -182,3 +182,36 @@ fn bad_gap_parameters_are_named_in_the_error() {
         );
     }
 }
+
+/// MINIMAL with a max speed and the `crack` Rule, ending on `escaped`.
+fn cracking() -> String {
+    format!(
+        "{}\n[[rules]]\nkind = \"crack\"\n\n[end_condition]\nkind = \"escaped\"\n",
+        MINIMAL.replace("speed = 900.0", "speed = 900.0\nmax_speed = 2000.0")
+    )
+}
+
+#[test]
+fn escaped_with_a_crack_is_valid() {
+    Scenario::from_toml_str("ok", &cracking()).expect("escaped with a crack is valid");
+}
+
+#[test]
+fn crack_needs_a_max_speed() {
+    let toml = cracking().replace("max_speed = 2000.0\n", "");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("broken") && err.contains("rules[0]: Rule 'crack' needs ball.max_speed"),
+        "{err}"
+    );
+}
+
+#[test]
+fn crack_has_no_parameters() {
+    let toml = cracking().replace("kind = \"crack\"", "kind = \"crack\"\nlength = 3.0");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("rules[0]") && err.contains("unknown field `length`"),
+        "{err}"
+    );
+}

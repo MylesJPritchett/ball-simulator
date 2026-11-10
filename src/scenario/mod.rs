@@ -272,8 +272,20 @@ impl Scenario {
             );
         }
         // Building Rules and End Conditions validates their kinds and parameters.
+        let sets_max_speed = self
+            .raw
+            .get("ball")
+            .and_then(|ball| ball.get("max_speed"))
+            .is_some();
         for (i, spec) in self.rules.iter().enumerate() {
-            crate::rules::build(spec).map_err(|m| self.invalid(format!("rules[{i}]: {m}")))?;
+            let rule =
+                crate::rules::build(spec).map_err(|m| self.invalid(format!("rules[{i}]: {m}")))?;
+            if rule.needs_max_speed() && !sets_max_speed {
+                return Err(self.invalid(format!(
+                    "rules[{i}]: Rule '{}' needs ball.max_speed",
+                    spec.kind
+                )));
+            }
         }
         crate::sim::end_condition::build(self)
             .map_err(|m| self.invalid(format!("end_condition: {m}")))?;

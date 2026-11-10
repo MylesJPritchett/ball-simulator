@@ -81,6 +81,12 @@ pub struct Arena {
     /// Openings in the Boundary, added by Rules that can let a ball out (see
     /// `Rule::lets_balls_out`). Balls pass through them instead of bouncing.
     pub gaps: Vec<Gap>,
+    /// Cracks in the Boundary, in the order they were made (see the `crack`
+    /// Rule). Only drawn: balls bounce off a cracked Boundary as usual.
+    pub cracks: Vec<Crack>,
+    /// Set once the Boundary has shattered (see the `crack` Rule). It is then
+    /// open all round, and drawn as shards flying out from where it broke.
+    pub shatter: Option<Shatter>,
 }
 
 /// An opening in the Boundary: the arc `width` radians wide centred on
@@ -92,11 +98,32 @@ pub struct Gap {
     pub width: f64,
 }
 
+/// A crack in the Boundary where a Boundary Hit landed.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Crack {
+    /// Where on the Boundary (radians, like a Boundary Hit's angle).
+    pub angle: f64,
+    /// How bad it is, from 0 (a hairline) to 1 (made at max speed); the
+    /// renderer draws bigger cracks longer and more branched.
+    pub size: f64,
+}
+
+/// Where and when the Boundary shattered.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Shatter {
+    /// Where on the Boundary it broke (radians, like a Boundary Hit's angle).
+    pub angle: f64,
+    /// The substep it broke on.
+    pub substep: u64,
+}
+
 impl Arena {
     pub fn new(radius: f64) -> Self {
         Arena {
             radius,
             gaps: Vec::new(),
+            cracks: Vec::new(),
+            shatter: None,
         }
     }
 

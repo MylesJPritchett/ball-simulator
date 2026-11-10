@@ -1,5 +1,5 @@
 # Every bounce it doubles: each Boundary Hit splits a ball in two, fanned
-# around its bounce, glowing hotter with Heat until white-hot at the
+# around its Boundary Hit, glowing hotter with Heat until white-hot at the
 # Population Cap, where the Video melts down.
 
 name = "Doubling"

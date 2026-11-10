@@ -13,7 +13,7 @@ radius = 460.0
 
 [ball]
 radius = 24.0
-# Bounces and splits keep a ball's speed, so every ball has the first ball's
+# Boundary Hits and splits keep a ball's speed, so every ball has the first ball's
 # energy: it must be fast enough for the strongest gravity to still let it
 # reach the top of the bowl (speed^2 > ~3 * strength * Arena radius), or the
 # top is never covered.

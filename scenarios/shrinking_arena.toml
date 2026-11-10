@@ -37,7 +37,7 @@ kind = "change_colour"
 [[rules]]
 kind = "play_note"
 
-# The payoff: the Boundary squeezes the ball.
+# The Terminal State: the Boundary squeezes the ball until it fills the Arena.
 [end_condition]
 kind = "arena_filled"
 

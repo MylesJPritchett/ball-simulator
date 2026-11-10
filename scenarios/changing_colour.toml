@@ -1,4 +1,4 @@
-# Every bounce changes colour: one ball bounces low under strong gravity
+# Every bounce changes colour: one ball stays low under strong gravity
 # and takes the next palette colour on every Boundary Hit, while a narrow
 # Gap creeps round the Boundary from the top towards it, until the ball
 # falls out.
@@ -21,7 +21,7 @@ kind = "gravity"
 strength = { min = 1800.0, max = 2200.0 }
 
 # Drag and speeding up on each hit balance out, so whatever its start every
-# ball soon settles into quick, low bounces near the bottom.
+# ball soon settles into quick, low Boundary Hits near the bottom.
 [[rules]]
 kind = "drag"
 strength = { min = 0.15, max = 0.2 }
@@ -38,7 +38,7 @@ kind = "change_colour"
 kind = "play_note"
 
 # A narrow opening that starts at the top, out of the ball's reach, and
-# turns slowly down towards where it bounces: near misses, then it is out.
+# turns slowly down towards where it hits the Boundary: near misses, then it is out.
 [[rules]]
 kind = "gap"
 width = 30.0

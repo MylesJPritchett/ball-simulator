@@ -5,7 +5,7 @@
 name = "Doubling"
 hook_title = "Every bounce it doubles — until it breaks"
 time_cap = 60.0
-population_cap = 1000000
+population_cap = 100000
 
 [arena]
 radius = 460.0
@@ -15,7 +15,7 @@ radius = 16.0
 speed = { min = 265.0, max = 310.0 }
 
 # A narrow fan keeps the children's chords long; wider fans reach the cap
-# much sooner. At this speed the cap comes at ~36-58 s (Video ~38-61 s).
+# much sooner. At this speed the cap comes at ~32-52 s (Video ~35-55 s).
 [[rules]]
 kind = "split"
 into = 2
@@ -39,7 +39,7 @@ heat = true
 # in seconds (action plus the Meltdown's Play-out and hold).
 [quality_gate]
 min_duration = 25.0
-max_duration = 55.0
+max_duration = 50.0
 min_boundary_hits = 1000
 
 [meta]

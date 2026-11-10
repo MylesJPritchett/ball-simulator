@@ -183,7 +183,7 @@ fn doubling(seed: u64, instrument: &str) -> SimRecord {
     let toml = format!(
         "{}\n[sound]\ninstrument = \"{instrument}\"\n",
         include_str!("../scenarios/doubling.toml")
-            .replace("population_cap = 1000000", "population_cap = 2000")
+            .replace("population_cap = 100000", "population_cap = 2000")
     );
     run(&toml, seed)
 }

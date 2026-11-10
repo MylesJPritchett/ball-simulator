@@ -139,11 +139,11 @@ fn shipped_doubling_metadata_names_its_population_cap() {
 
     assert_eq!(
         meta.title,
-        "Every bounce it doubles - until it breaks at 1000000"
+        "Every bounce it doubles - until it breaks at 100000"
     );
     assert!(
         meta.description
-            .contains("until there are 1000000 and it melts down."),
+            .contains("until there are 100000 and it melts down."),
         "{}",
         meta.description
     );

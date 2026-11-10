@@ -5,7 +5,7 @@ mod support;
 use ball_simulator::scenario::Scenario;
 use ball_simulator::sim::rng::Rng;
 use ball_simulator::{batch, pipeline};
-use support::MINIMAL;
+use support::filled_after;
 
 /// Draws `n` Scenarios in a row out of `count` from a shuffle-bag, none retired.
 fn picks(count: usize, n: usize, seed: u64) -> Vec<usize> {
@@ -56,17 +56,16 @@ fn retired_scenarios_are_never_picked() {
     assert_eq!(bag.next(&mut rng, &[0, 1, 2, 3]), None);
 }
 
+/// The ball fills the Arena 5 s in.
 fn named(id: &str, extra: &str) -> Scenario {
-    let toml = format!("{MINIMAL}\n[end_condition]\nkind = \"time_cap\"\n{extra}");
+    let toml = format!("{}{extra}", filled_after(5.0));
     Scenario::from_toml_str(id, &toml).unwrap()
 }
 
-/// Seeds below speed ~600 are too quiet for this gate, so some get rejected.
+/// Seeds below speed ~400 are too quiet for this gate, so some get rejected.
 fn sometimes_quiet(id: &str) -> Scenario {
-    let toml = MINIMAL.replace("speed = 900.0", "speed = { min = 200.0, max = 1600.0 }");
-    let toml = format!(
-        "{toml}\n[end_condition]\nkind = \"time_cap\"\n[quality_gate]\nmin_boundary_hits = 6\n"
-    );
+    let toml = filled_after(5.0).replace("speed = 900.0", "speed = { min = 200.0, max = 1600.0 }");
+    let toml = format!("{toml}\n[quality_gate]\nmin_boundary_hits = 100\n");
     Scenario::from_toml_str(id, &toml).unwrap()
 }
 

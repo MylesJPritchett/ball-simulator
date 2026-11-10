@@ -35,20 +35,34 @@ fn arena_stops_shrinking_at_the_minimum_radius() {
     assert_eq!(record.final_arena_radius, 200.0);
 }
 
-#[test]
-fn arena_min_reached_ends_when_the_arena_stops_shrinking() {
-    // 460 -> 200 at 100 units/s takes 2.6 s; the time cap is 5 s.
-    let toml = shrinking(100.0, 200.0, 5.0)
-        + "\n[end_condition]\nkind = \"arena_min_reached\"\nmin_radius = 200.0\n";
-    let record = run(&toml, 1);
+/// The shrinking-Arena Rule without a minimum: the Arena closes in on the
+/// ball (radius 30) from 460 at 100 units/s, meeting it after 4.3 s.
+fn closing_in_on_the_ball(end_condition: &str) -> String {
+    MINIMAL.replace("time_cap = 5.0", "time_cap = 6.0")
+        + "\n[[rules]]\nkind = \"shrinking_arena\"\nrate = 100.0\n"
+        + &format!("\n[end_condition]\nkind = \"{end_condition}\"\n")
+}
 
-    assert_eq!(record.end.condition, "arena_min_reached");
+#[test]
+fn without_a_minimum_the_arena_closes_in_until_it_meets_the_ball() {
+    // Nothing vanishes, so the run lasts until the 6 s time cap.
+    let record = run(&closing_in_on_the_ball("vanished"), 1);
+
+    assert_eq!(record.end.condition, "time_cap");
+    assert_eq!(record.final_arena_radius, 30.0);
+    assert_eq!(record.final_balls[0].radius, 30.0);
+}
+
+#[test]
+fn arena_filled_ends_the_squeeze_the_moment_the_arena_meets_the_ball() {
+    let record = run(&closing_in_on_the_ball("arena_filled"), 1);
+
+    assert_eq!(record.end.condition, "arena_filled");
     assert!(
-        (record.end.time() - 2.6).abs() <= 1.0 / 240.0,
+        (record.end.time() - 4.3).abs() <= 1.0 / 240.0,
         "{}",
         record.end.time()
     );
-    assert_eq!(record.final_arena_radius, 200.0);
 }
 
 #[test]
@@ -98,7 +112,7 @@ fn ball_caught_by_the_closing_boundary_registers_a_boundary_hit() {
 #[test]
 fn invalid_parameters_are_rejected_with_clear_errors() {
     let error_for = |toml: &str| {
-        let toml = format!("{toml}\n[end_condition]\nkind = \"time_cap\"\n");
+        let toml = format!("{toml}\n[end_condition]\nkind = \"arena_filled\"\n");
         Scenario::from_toml_str("broken", &toml)
             .expect_err("Scenario should be rejected")
             .to_string()
@@ -116,9 +130,9 @@ fn invalid_parameters_are_rejected_with_clear_errors() {
         "{err}"
     );
 
-    let missing = format!("{MINIMAL}\n[[rules]]\nkind = \"shrinking_arena\"\nrate = 5.0\n");
+    let missing = format!("{MINIMAL}\n[[rules]]\nkind = \"shrinking_arena\"\n");
     let err = error_for(&missing);
-    assert!(err.contains("min_radius"), "{err}");
+    assert!(err.contains("missing field `rate`"), "{err}");
 }
 
 #[test]

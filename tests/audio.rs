@@ -359,7 +359,7 @@ fn unknown_sound_pins_are_rejected() {
         "tempo = 3",
     ] {
         let toml = format!(
-            "{}\n[end_condition]\nkind = \"time_cap\"\n",
+            "{}\n[end_condition]\nkind = \"arena_filled\"\n",
             with_sound(bad)
         );
         let err = Scenario::from_toml_str("inline", &toml)

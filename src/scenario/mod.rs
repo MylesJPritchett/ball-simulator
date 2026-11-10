@@ -51,7 +51,8 @@ pub struct Scenario {
     /// Shown above the Arena and used as the Video title. Defaults to `name`.
     #[serde(default)]
     pub hook_title: String,
-    /// Hard time cap in seconds; always an End Condition.
+    /// Hard time cap in seconds: a safety net, not an End Condition. A Seed
+    /// that reaches it is rejected by the Quality Gate.
     pub time_cap: f64,
     /// Maximum ball count; the simulation never exceeds it.
     #[serde(default = "default_population_cap")]
@@ -60,7 +61,7 @@ pub struct Scenario {
     pub ball: BallSpec,
     #[serde(default)]
     pub rules: Vec<RuleSpec>,
-    /// The Scenario's End Condition (`kind = "time_cap"` for the cap alone).
+    /// The Scenario's End Condition, which must reach a Terminal State.
     pub end_condition: RuleSpec,
     /// Thresholds a Seed must meet to be rendered.
     #[serde(default)]
@@ -188,7 +189,8 @@ impl Scenario {
                     .to_string()
                     .contains("missing field `end_condition`")
                 {
-                    "missing [end_condition] (use kind = \"time_cap\" to end at the time cap)"
+                    "missing [end_condition] (it must reach a Terminal State, \
+                     e.g. kind = \"arena_filled\")"
                         .to_string()
                 } else {
                     with_path(&e.path().to_string(), e.inner())

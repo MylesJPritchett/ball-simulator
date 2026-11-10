@@ -66,21 +66,6 @@ fn vanished_fires_on_the_hit_that_would_shrink_a_ball_below_zero() {
 }
 
 #[test]
-fn min_radius_reached_ends_on_the_hit_that_shrinks_a_ball_to_the_minimum() {
-    let toml = format!(
-        "{}\n[end_condition]\nkind = \"min_radius_reached\"\nmin_radius = 10.0\n",
-        with_rule("kind = \"shrink\"\namount = 10.0")
-    );
-    let record = run(&toml, SEED);
-
-    assert_eq!(record.end.condition, "min_radius_reached");
-    // 30 -> 20 -> 10: the second hit reaches the minimum.
-    assert_eq!(record.boundary_hits.len(), 2);
-    assert_eq!(record.boundary_hits[1].substep, record.end.substep);
-    assert_eq!(record.final_balls[0].radius, 10.0);
-}
-
-#[test]
 fn a_growing_ball_never_ends_a_substep_outside_the_arena() {
     for seed in 0..10 {
         let record = run(&with_rule("kind = \"grow\"\namount = 25.0"), seed);

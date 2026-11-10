@@ -65,6 +65,10 @@ impl Split {
 }
 
 impl Rule for Split {
+    fn adds_balls(&self) -> bool {
+        true
+    }
+
     fn on_boundary_hit(
         &mut self,
         state: &mut SimState,

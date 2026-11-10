@@ -60,7 +60,7 @@ fn without_templates_the_title_is_the_hook_title_and_tags_are_the_shared_pool() 
 #[test]
 fn a_scenario_with_an_unknown_placeholder_is_invalid() {
     let toml = format!(
-        "{MINIMAL}\n[end_condition]\nkind = \"time_cap\"\n[meta]\ntitle = \"Reach {{cap_typo}}\"\n"
+        "{MINIMAL}\n[end_condition]\nkind = \"arena_filled\"\n[meta]\ntitle = \"Reach {{cap_typo}}\"\n"
     );
     let err = Scenario::from_toml_str("typo", &toml)
         .unwrap_err()

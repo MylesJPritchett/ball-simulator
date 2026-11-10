@@ -41,7 +41,7 @@ fn pinned_palette_is_used_for_every_seed() {
 #[test]
 fn unknown_pinned_palette_is_rejected() {
     let toml = format!(
-        "{}\n[end_condition]\nkind = \"time_cap\"\n",
+        "{}\n[end_condition]\nkind = \"arena_filled\"\n",
         with_look("palette = \"plaid\"")
     );
     let err = Scenario::from_toml_str("broken", &toml)

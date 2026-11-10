@@ -3,9 +3,7 @@
 mod support;
 
 use ball_simulator::scenario::Scenario;
-use support::MINIMAL;
-
-const TIME_CAP_END: &str = "\n[end_condition]\nkind = \"time_cap\"\n";
+use support::{MINIMAL, NEVER_ENDS};
 
 fn error_for(toml: &str) -> String {
     Scenario::from_toml_str("broken", toml)
@@ -15,7 +13,7 @@ fn error_for(toml: &str) -> String {
 
 /// MINIMAL plus an End Condition: a complete, valid Scenario file.
 fn complete() -> String {
-    format!("{MINIMAL}{TIME_CAP_END}")
+    format!("{MINIMAL}{NEVER_ENDS}")
 }
 
 #[test]
@@ -33,6 +31,38 @@ fn unknown_end_condition_is_named_in_the_error() {
     let toml = format!("{MINIMAL}\n[end_condition]\nkind = \"forever\"\n");
     let err = error_for(&toml);
     assert!(err.contains("unknown End Condition 'forever'"), "{err}");
+}
+
+#[test]
+fn threshold_end_conditions_are_refused_as_not_terminal() {
+    for (kind, params) in [
+        ("population_cap", ""),
+        ("max_speed_reached", ""),
+        ("min_radius_reached", "min_radius = 10.0\n"),
+        ("arena_min_reached", "min_radius = 100.0\n"),
+    ] {
+        let toml = format!("{MINIMAL}\n[end_condition]\nkind = \"{kind}\"\n{params}");
+        let err = error_for(&toml);
+        assert!(
+            err.contains("broken")
+                && err.contains(&format!(
+                    "end_condition: End Condition '{kind}' is not a Terminal State"
+                )),
+            "{kind}: {err}"
+        );
+    }
+}
+
+#[test]
+fn the_time_cap_is_refused_as_an_end_condition() {
+    let toml = format!("{MINIMAL}\n[end_condition]\nkind = \"time_cap\"\n");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("broken")
+            && err.contains("end_condition: End Condition 'time_cap' is not a Terminal State")
+            && err.contains("safety net"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -142,6 +172,26 @@ fn escaped_needs_a_rule_that_can_let_a_ball_out() {
             ),
         "{err}"
     );
+}
+
+#[test]
+fn meltdown_needs_a_rule_that_adds_balls() {
+    let toml = format!("{MINIMAL}\n[end_condition]\nkind = \"meltdown\"\n");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("broken")
+            && err.contains("end_condition: End Condition 'meltdown' needs a Rule that adds balls"),
+        "{err}"
+    );
+}
+
+#[test]
+fn meltdown_with_a_split_is_valid() {
+    let toml = format!(
+        "{MINIMAL}\n[[rules]]\nkind = \"split\"\ninto = 2\nspread = 30.0\n\
+         \n[end_condition]\nkind = \"meltdown\"\n"
+    );
+    Scenario::from_toml_str("ok", &toml).expect("meltdown with a split is valid");
 }
 
 #[test]

@@ -29,7 +29,6 @@ strength = { min = 300.0, max = 600.0 }
 [[rules]]
 kind = "shrinking_arena"
 rate = { min = 9.5, max = 11.5 }  # Arena radius lost per second
-min_radius = 60.0                 # the ball's radius: arena_filled ends it here
 
 [[rules]]
 kind = "change_colour"

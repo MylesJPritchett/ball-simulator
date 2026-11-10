@@ -41,14 +41,18 @@ fn generate_writes_a_one_second_video_with_audio_and_metadata() {
         &scenario,
         r#"
 name = "Smoke"
-time_cap = 1.0
+time_cap = 2.0
 [arena]
 radius = 460.0
 [ball]
 radius = 30.0
 speed = { min = 2500.0, max = 3500.0 }
+# The Arena closes in on the ball, filling it 1 s in.
+[[rules]]
+kind = "shrinking_arena"
+rate = 430.0
 [end_condition]
-kind = "time_cap"
+kind = "arena_filled"
 "#,
     )
     .unwrap();

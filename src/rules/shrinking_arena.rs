@@ -1,5 +1,6 @@
 //! Shrinking Arena: the Arena's radius closes in at a constant rate until it
-//! reaches a minimum.
+//! meets the largest ball (the Arena is filled, a Terminal State), or until an
+//! optional minimum.
 //!
 //! The Arena shrinks in `on_substep`, before balls move, so the same substep's
 //! Boundary resolution keeps every ball inside the new radius; a ball caught by
@@ -18,8 +19,8 @@ use crate::sim::SimState;
 struct Params {
     /// Arena radius lost per second, in simulation units.
     rate: f64,
-    /// The Arena stops shrinking at this radius.
-    min_radius: f64,
+    /// Optional: the Arena stops shrinking at this radius.
+    min_radius: Option<f64>,
 }
 
 pub struct ShrinkingArena {
@@ -30,18 +31,30 @@ pub struct ShrinkingArena {
 impl ShrinkingArena {
     pub fn from_spec(spec: &RuleSpec) -> Result<Self, String> {
         let p: Params = params(spec)?;
+        let min_radius = match p.min_radius {
+            Some(min) => positive_finite(spec, "min_radius", min)?,
+            None => 0.0,
+        };
         Ok(ShrinkingArena {
             rate: non_negative_finite(spec, "rate", p.rate)?,
-            min_radius: positive_finite(spec, "min_radius", p.min_radius)?,
+            min_radius,
         })
     }
 }
 
 impl Rule for ShrinkingArena {
     fn on_substep(&mut self, state: &mut SimState, ctx: &mut RuleContext) {
+        // The Boundary cannot close in past a ball it has squeezed.
+        let largest = state
+            .balls
+            .iter()
+            .filter(|ball| !ball.escaping)
+            .map(|ball| ball.radius)
+            .fold(0.0, f64::max);
+        let floor = self.min_radius.max(largest);
         let arena = &mut state.arena;
-        if arena.radius > self.min_radius {
-            arena.radius = (arena.radius - self.rate * ctx.dt).max(self.min_radius);
+        if arena.radius > floor {
+            arena.radius = (arena.radius - self.rate * ctx.dt).max(floor);
         }
     }
 }

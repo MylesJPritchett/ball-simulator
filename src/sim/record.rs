@@ -73,7 +73,8 @@ pub struct BallCountSample {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct EndEvent {
-    /// End Condition id, e.g. `"time_cap"`.
+    /// End Condition id, e.g. `"arena_filled"`, or `"time_cap"` if the time
+    /// cap ended the run instead.
     pub condition: String,
     /// Substeps completed when it fired.
     pub substep: u64,

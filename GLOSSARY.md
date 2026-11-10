@@ -1,6 +1,6 @@
 # Ball Simulator
 
-Generates short, satisfying 2D videos of balls bouncing inside an arena, where every boundary hit makes a sound and may trigger an effect.
+Generates short, satisfying 2D videos of balls bouncing inside an arena, where every boundary hit makes a sound and may trigger a Rule.
 
 ## Language
 
@@ -37,6 +37,9 @@ What follows the End Condition: an optional Play-out, then the frozen final fram
 
 **Play-out**:
 The short stretch after the End Condition fires in which the Terminal State finishes on screen (e.g. an escaping ball leaving the frame) before the freeze.
+
+**Finale**:
+What the Video draws over the Play-out to show the Terminal State landing (e.g. a vanished ball's pop, the Meltdown's breakdown). Chosen by the End Condition.
 
 **Hook Title**:
 The short premise shown above the Arena and used as the Video's title (e.g. "Every bounce it doubles").

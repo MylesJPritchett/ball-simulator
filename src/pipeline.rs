@@ -178,7 +178,7 @@ fn render(
     // Frame k shows the state after k * SUBSTEPS_PER_FRAME substeps; the run
     // keeps going through the Play-out, then `step_frame` does nothing, so the
     // action freezes, the trails keep fading and the renderer plays the
-    // Ending's effects over it.
+    // Ending's flash and Finale over it.
     for _ in 0..frames {
         encoder.write_frame(renderer.draw(&sim, Some(&ending)))?;
         sim.step_frame();

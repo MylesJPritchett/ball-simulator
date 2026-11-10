@@ -3,8 +3,8 @@
 //! The End Condition chooses its Ending's shape ([`EndingStyle`]): an optional
 //! Play-out in which the simulation keeps going and the Terminal State finishes
 //! on screen, whether a flash plays and the final chord sounds and when
-//! ([`Accent`]), and which effect the renderer draws over the Play-out. After the Play-out the action
-//! freezes and the frozen frame holds for [`HOLD_SECONDS`] before the Video
+//! ([`Accent`]), and the [`Finale`] the renderer draws over the Play-out.
+//! After the Play-out the action freezes and the frozen frame holds for [`HOLD_SECONDS`] before the Video
 //! cuts. Everything downstream reads the timing from [`Ending`] (via
 //! `SimRecord::ending`, built only by `Simulation::ending`) so render, audio
 //! (final chord) and the Quality Gate agree.
@@ -36,7 +36,7 @@ pub struct EndingStyle {
     /// When the flash and the final chord start.
     pub accent: Accent,
     /// What the renderer draws over the Play-out.
-    pub effect: Effect,
+    pub finale: Finale,
 }
 
 impl Default for EndingStyle {
@@ -46,7 +46,7 @@ impl Default for EndingStyle {
             flash: true,
             final_chord: true,
             accent: Accent::AtFire,
-            effect: Effect::None,
+            finale: Finale::None,
         }
     }
 }
@@ -87,10 +87,11 @@ impl PlayOut {
     }
 }
 
-/// What the renderer draws over the Play-out, timed by [`Ending::play_out_at`].
+/// The Ending's Finale: the flourish the renderer draws over the Play-out,
+/// timed by [`Ending::play_out_at`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Effect {
+pub enum Finale {
     None,
     /// An expanding, fading ring where each vanished ball was.
     Pop,
@@ -116,7 +117,7 @@ pub struct Ending {
     /// Whether the final chord sounds at `accent_substep`.
     pub final_chord: bool,
     /// What the renderer draws over the Play-out.
-    pub effect: Effect,
+    pub finale: Finale,
 }
 
 impl Ending {
@@ -135,7 +136,7 @@ impl Ending {
             },
             cut_substep: freeze_substep + to_substeps(HOLD_SECONDS),
             final_chord: style.final_chord,
-            effect: style.effect,
+            finale: style.finale,
         }
     }
 

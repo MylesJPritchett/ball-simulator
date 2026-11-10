@@ -3,7 +3,7 @@
 
 mod support;
 
-use ball_simulator::sim::{Effect, SUBSTEP_HZ};
+use ball_simulator::sim::{Finale, SUBSTEP_HZ};
 use support::{run, MINIMAL};
 
 /// One ball that splits in two on every Boundary Hit and melts down once
@@ -34,7 +34,7 @@ fn the_meltdown_plays_out_without_a_flash_or_final_chord_then_holds() {
     let record = run(&melting(), 1);
     let ending = &record.ending;
 
-    assert_eq!(ending.effect, Effect::Meltdown);
+    assert_eq!(ending.finale, Finale::Meltdown);
     assert_eq!(ending.flash_substeps, 0, "no flash");
     assert!(!ending.final_chord, "no final chord");
     // A 1.5 s Play-out, then the usual 1.5 s hold.

@@ -9,7 +9,7 @@
 //! flash or the final chord.
 
 use crate::scenario::{RuleSpec, Scenario};
-use crate::sim::ending::{Accent, Effect, EndingStyle, PlayOut};
+use crate::sim::ending::{Accent, EndingStyle, Finale, PlayOut};
 use crate::sim::SimState;
 
 /// The id a run ends with when its End Condition never fired.
@@ -159,7 +159,7 @@ impl EndCondition for ArenaCovered {
     fn is_met(&self, state: &SimState, _substep: u64) -> bool {
         let radius = state.arena.radius * (1.0 - RIM_MARGIN);
         // The union is never larger than the sum of the balls' areas, so the
-        // grid is only sampled once that sum could reach the threshold.
+        // grid is only sampled once that sum could reach COVERED_FRACTION.
         let ball_area: f64 = state.balls.iter().map(|b| b.radius * b.radius).sum();
         ball_area >= COVERED_FRACTION * radius * radius
             && coverage(state, radius) >= COVERED_FRACTION
@@ -243,7 +243,7 @@ impl EndCondition for Vanished {
                 seconds: POP_SECONDS,
             },
             accent: Accent::AtFire,
-            effect: Effect::Pop,
+            finale: Finale::Pop,
             ..EndingStyle::default()
         }
     }
@@ -323,7 +323,7 @@ pub const MELTDOWN_SECONDS: f64 = 1.5;
 /// The ball count has reached the Scenario's Population Cap and the Video
 /// appears to break down under its own load. Staged, not real: rendering is
 /// offline (ADR 0001), so the renderer and audio draw the breakdown from the
-/// Seed. No flash and no final chord, so the crash does not resolve neatly.
+/// Seed. No flash and no final chord, so the breakdown does not resolve neatly.
 struct Meltdown {
     cap: usize,
 }
@@ -345,7 +345,7 @@ impl EndCondition for Meltdown {
             flash: false,
             final_chord: false,
             accent: Accent::AtFire,
-            effect: Effect::Meltdown,
+            finale: Finale::Meltdown,
         }
     }
 }

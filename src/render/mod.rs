@@ -3,10 +3,10 @@
 //! The renderer is fed a [`Simulation`] after each frame's substeps, with its
 //! [`Ending`] (see [`crate::pipeline`]); it never advances physics itself, so
 //! anything that drives a `Simulation` frame by frame (the encoder, a preview
-//! window) gets identical frames, Ending effects included.
+//! window) gets identical frames, the Ending's flash and Finale included.
 //!
 //! Draw order: background, fading trails, Boundary (with its cracks), hit
-//! glows, balls, the Play-out's effect (e.g. a pop), Hook Title, Counter, then
+//! glows, balls, the Ending's Finale (e.g. a pop), Hook Title, Counter, then
 //! the Ending's flash over everything; a Meltdown breaks the finished frame
 //! down last. Trails and glows are clipped to the Arena (Boundary included).
 //! With Heat on, the Heat field takes the place of trails and balls.
@@ -25,7 +25,7 @@ use tiny_skia::{
 use crate::look::palette::{Palette, Rgb};
 use crate::look::{Counter, LookSpec};
 use crate::scenario::Scenario;
-use crate::sim::{Ball, Effect, Ending, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
+use crate::sim::{Ball, Ending, Finale, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
 use heat::Heat;
 use meltdown::Meltdown;
 use text::{FittedText, TextPainter};
@@ -208,14 +208,14 @@ impl Renderer {
         if self.heat.is_none() {
             self.draw_balls(sim, palette);
         }
-        let play_out = ending.and_then(|e| Some((e.effect, e.play_out_at(now)?)));
-        if let Some((Effect::Pop, t)) = play_out {
+        let play_out = ending.and_then(|e| Some((e.finale, e.play_out_at(now)?)));
+        if let Some((Finale::Pop, t)) = play_out {
             self.draw_pops(sim, palette, t);
         }
         self.draw_text(sim, palette);
         if let Some(ending) = ending {
             self.draw_flash(ending.flash_at(now));
-            if ending.effect == Effect::Meltdown {
+            if ending.finale == Finale::Meltdown {
                 self.draw_meltdown(sim, ending, now);
             }
         }

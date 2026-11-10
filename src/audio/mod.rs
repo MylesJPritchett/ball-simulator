@@ -15,7 +15,7 @@ mod wav;
 
 pub use wav::write_wav;
 
-use crate::sim::{Effect, SimRecord, SUBSTEP_HZ};
+use crate::sim::{Finale, SimRecord, SUBSTEP_HZ};
 
 pub const SAMPLE_RATE: u32 = 48_000;
 /// 48 kHz / 480 Hz: every substep lands exactly on a sample boundary.
@@ -137,7 +137,7 @@ pub fn synthesize(record: &SimRecord) -> Vec<f32> {
         );
     }
     let ending = &record.ending;
-    let meltdown = ending.effect == Effect::Meltdown;
+    let meltdown = ending.finale == Finale::Meltdown;
     if meltdown {
         meltdown::crackle(&mut dry, ending, record.seed);
     }

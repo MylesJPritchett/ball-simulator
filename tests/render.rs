@@ -6,7 +6,7 @@ mod support;
 use std::f64::consts::PI;
 
 use ball_simulator::render::{layout, Renderer};
-use ball_simulator::sim::{self, Effect, Ending, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
+use ball_simulator::sim::{self, Ending, Finale, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
 use support::{scenario, MINIMAL};
 
 /// Width of the Boundary stroke as drawn (just outside the Arena's edge).
@@ -297,19 +297,19 @@ fn a_vanished_ball_pops_during_the_play_out_and_the_pop_is_gone_by_the_freeze() 
     let ending = record.ending;
     let frames = ending.frames();
     // The same frames with and without the pop drawn.
-    let draw = |effect: Effect| {
+    let draw = |finale: Finale| {
         let mut out = Vec::new();
         draw_frames_with(
             &toml,
             3,
             frames,
-            |e| Ending { effect, ..e },
+            |e| Ending { finale, ..e },
             |_, f| out.push(f.to_vec()),
         );
         out
     };
-    let popped = draw(Effect::Pop);
-    let plain = draw(Effect::None);
+    let popped = draw(Finale::Pop);
+    let plain = draw(Finale::None);
 
     // Where the ball was when it vanished, on screen.
     let arena = layout::arena();
@@ -417,8 +417,8 @@ fn melting() -> String {
 }
 
 /// The hash of every frame of `melting()` with Seed `seed`, drawn with the
-/// run's Ending as `effect` changes it.
-fn melting_frames(seed: u64, effect: Effect) -> Vec<u64> {
+/// run's Ending as `finale` changes it.
+fn melting_frames(seed: u64, finale: Finale) -> Vec<u64> {
     let toml = melting();
     let frames = support::run(&toml, seed).ending.frames();
     let mut out = Vec::new();
@@ -426,7 +426,7 @@ fn melting_frames(seed: u64, effect: Effect) -> Vec<u64> {
         &toml,
         seed,
         frames,
-        |e| Ending { effect, ..e },
+        |e| Ending { finale, ..e },
         |_, f| out.push(frame_hash(f)),
     );
     out
@@ -435,8 +435,8 @@ fn melting_frames(seed: u64, effect: Effect) -> Vec<u64> {
 #[test]
 fn the_meltdown_stutters_longer_and_longer_glitches_and_cuts_to_a_broken_frame() {
     let ending = support::run(&melting(), 1).ending;
-    let melted = melting_frames(1, Effect::Meltdown);
-    let plain = melting_frames(1, Effect::None);
+    let melted = melting_frames(1, Finale::Meltdown);
+    let plain = melting_frames(1, Finale::None);
     let frame_of = |substep: u64| substep.div_ceil(SUBSTEPS_PER_FRAME) as usize;
     let (first, freeze) = (
         frame_of(ending.start_substep),
@@ -486,13 +486,13 @@ fn the_meltdown_stutters_longer_and_longer_glitches_and_cuts_to_a_broken_frame()
 fn the_same_seed_gives_the_same_record_frames_and_samples_with_the_meltdown() {
     let video = || {
         let record = support::run(&melting(), 1);
-        let frames = melting_frames(1, record.ending.effect);
+        let frames = melting_frames(1, record.ending.finale);
         let samples = ball_simulator::audio::synthesize(&record);
         (record, frames, samples)
     };
     let (first, second) = (video(), video());
 
-    assert_eq!(first.0.ending.effect, Effect::Meltdown);
+    assert_eq!(first.0.ending.finale, Finale::Meltdown);
     assert_eq!(first.0, second.0);
     assert!(first.1 == second.1, "same frames");
     assert!(first.2 == second.2, "same samples");

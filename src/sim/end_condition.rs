@@ -20,6 +20,7 @@ pub const MAX_SPEED_REACHED: &str = "max_speed_reached";
 pub const MIN_RADIUS_REACHED: &str = "min_radius_reached";
 pub const ARENA_MIN_REACHED: &str = "arena_min_reached";
 pub const VANISHED: &str = "vanished";
+pub const ESCAPED: &str = "escaped";
 pub const MELTDOWN: &str = "meltdown";
 
 pub trait EndCondition {
@@ -78,6 +79,17 @@ pub fn build(scenario: &Scenario) -> Result<Option<Box<dyn EndCondition>>, Strin
         VANISHED => {
             no_params(spec)?;
             Ok(Some(Box::new(Vanished)))
+        }
+        ESCAPED => {
+            no_params(spec)?;
+            let rules = crate::rules::build_all(scenario)?;
+            if !rules.iter().any(|rule| rule.lets_balls_out()) {
+                return Err(format!(
+                    "End Condition '{ESCAPED}' needs a Rule that can let a ball out (e.g. '{}')",
+                    crate::rules::GAP
+                ));
+            }
+            Ok(Some(Box::new(Escaped::new(scenario.arena.radius))))
         }
         MELTDOWN => {
             no_params(spec)?;
@@ -147,11 +159,18 @@ impl EndCondition for ArenaFilled {
 /// not a parameter: below this the Arena visibly has holes (ADR 0002).
 pub const COVERED_FRACTION: f64 = 0.98;
 
+/// Width of the rim left out of the coverage measure, as a fraction of the
+/// Arena radius (about the Boundary stroke's width on screen). A bouncing ball
+/// covers the rim only at the instant it touches the Boundary, so even a dense
+/// swarm leaves a thin scalloped gap there that does not stop the Arena
+/// reading as full.
+pub const RIM_MARGIN: f64 = 0.02;
+
 /// Rows (and columns) of the grid that [`coverage`] samples the Arena on.
 const COVERAGE_GRID: usize = 256;
 
-/// The balls together cover [`COVERED_FRACTION`] of the Arena's area, with
-/// overlaps counted once.
+/// The balls together cover [`COVERED_FRACTION`] of the Arena inside its
+/// [`RIM_MARGIN`], with overlaps counted once.
 struct ArenaCovered;
 
 impl EndCondition for ArenaCovered {
@@ -160,40 +179,41 @@ impl EndCondition for ArenaCovered {
     }
 
     fn is_met(&self, state: &SimState, _substep: u64) -> bool {
+        let radius = state.arena.radius * (1.0 - RIM_MARGIN);
         // The union is never larger than the sum of the balls' areas, so the
         // grid is only sampled once that sum could reach the threshold.
-        let arena_area = state.arena.radius * state.arena.radius;
         let ball_area: f64 = state.balls.iter().map(|b| b.radius * b.radius).sum();
-        ball_area >= COVERED_FRACTION * arena_area && coverage(state) >= COVERED_FRACTION
+        ball_area >= COVERED_FRACTION * radius * radius
+            && coverage(state, radius) >= COVERED_FRACTION
     }
 }
 
-/// Fraction of the Arena covered by at least one ball, estimated on a fixed
-/// grid over the Arena: the share of grid cells inside the Arena whose centre
-/// is inside a ball. Each ball fills one span of cells per grid row, so the
-/// cost grows with the balls' total height in rows, not their area.
-fn coverage(state: &SimState) -> f64 {
-    let arena = state.arena.radius;
-    let cell = 2.0 * arena / COVERAGE_GRID as f64;
-    let centre = |index: usize| -arena + (index as f64 + 0.5) * cell;
+/// Fraction of the circle of `radius` round the Arena's centre covered by at
+/// least one ball, estimated on a fixed grid over it: the share of grid cells
+/// inside the circle whose centre is inside a ball. Each ball fills one span
+/// of cells per grid row, so the cost grows with the balls' total height in
+/// rows, not their area.
+fn coverage(state: &SimState, radius: f64) -> f64 {
+    let cell = 2.0 * radius / COVERAGE_GRID as f64;
+    let centre = |index: usize| -radius + (index as f64 + 0.5) * cell;
     // The cells (first, last) whose centres lie within [lo, hi] on one axis.
     let cells = |lo: f64, hi: f64| {
-        let first = ((lo + arena) / cell - 0.5).ceil().max(0.0);
-        let last = ((hi + arena) / cell - 0.5)
+        let first = ((lo + radius) / cell - 0.5).ceil().max(0.0);
+        let last = ((hi + radius) / cell - 0.5)
             .floor()
             .min((COVERAGE_GRID - 1) as f64);
         (first <= last).then_some((first as usize, last as usize))
     };
-    let half_chord = |radius: f64, offset: f64| (radius * radius - offset * offset).max(0.0).sqrt();
+    let half_chord = |r: f64, offset: f64| (r * r - offset * offset).max(0.0).sqrt();
 
-    // Each row's span of cells inside the Arena.
-    let arena_spans: Vec<Option<(usize, usize)>> = (0..COVERAGE_GRID)
+    // Each row's span of cells inside the circle.
+    let circle_spans: Vec<Option<(usize, usize)>> = (0..COVERAGE_GRID)
         .map(|row| {
-            let w = half_chord(arena, centre(row));
+            let w = half_chord(radius, centre(row));
             cells(-w, w)
         })
         .collect();
-    let arena_cells: usize = arena_spans
+    let circle_cells: usize = circle_spans
         .iter()
         .flatten()
         .map(|(first, last)| last - first + 1)
@@ -204,22 +224,22 @@ fn coverage(state: &SimState) -> f64 {
         let Some((top, bottom)) = cells(ball.pos.y - ball.radius, ball.pos.y + ball.radius) else {
             continue;
         };
-        for (row, arena_span) in arena_spans.iter().enumerate().take(bottom + 1).skip(top) {
-            let Some((arena_first, arena_last)) = *arena_span else {
+        for (row, circle_span) in circle_spans.iter().enumerate().take(bottom + 1).skip(top) {
+            let Some((circle_first, circle_last)) = *circle_span else {
                 continue;
             };
             let w = half_chord(ball.radius, centre(row) - ball.pos.y);
             let Some((first, last)) = cells(ball.pos.x - w, ball.pos.x + w) else {
                 continue;
             };
-            let (first, last) = (first.max(arena_first), last.min(arena_last));
+            let (first, last) = (first.max(circle_first), last.min(circle_last));
             if first <= last {
                 let start = row * COVERAGE_GRID;
                 covered[start + first..=start + last].fill(true);
             }
         }
     }
-    covered.iter().filter(|&&c| c).count() as f64 / arena_cells as f64
+    covered.iter().filter(|&&c| c).count() as f64 / circle_cells as f64
 }
 
 /// Speed limits are applied by scaling, so a ball at the limit can be a
@@ -301,6 +321,72 @@ impl EndCondition for Vanished {
             effect: Effect::Pop,
             ..EndingStyle::default()
         }
+    }
+}
+
+/// The longest an escape plays out, should the ball be too slow to leave the
+/// frame.
+pub const ESCAPE_PLAY_OUT_MAX_SECONDS: f64 = 3.0;
+
+/// A ball has escaped: it is fully outside the Arena, through a Gap or
+/// whatever else a Rule opened in the Boundary. The Play-out runs until every
+/// escaping ball has left the Video frame.
+struct Escaped {
+    /// The Video frame in simulation units, as (left, top, right, bottom)
+    /// around the Arena's centre.
+    frame: (f64, f64, f64, f64),
+}
+
+impl Escaped {
+    /// `arena_radius` is the Arena's starting radius, which the renderer
+    /// scales to the laid-out Arena.
+    fn new(arena_radius: f64) -> Self {
+        let arena = crate::render::layout::arena();
+        let scale = arena_radius / arena.radius as f64;
+        let (cx, cy) = (arena.center_x as f64, arena.center_y as f64);
+        let (width, height) = (
+            crate::render::layout::WIDTH as f64,
+            crate::render::layout::HEIGHT as f64,
+        );
+        Escaped {
+            frame: (
+                -cx * scale,
+                -cy * scale,
+                (width - cx) * scale,
+                (height - cy) * scale,
+            ),
+        }
+    }
+}
+
+impl EndCondition for Escaped {
+    fn id(&self) -> &'static str {
+        ESCAPED
+    }
+
+    fn is_met(&self, state: &SimState, _substep: u64) -> bool {
+        let arena = state.arena.radius;
+        state
+            .balls
+            .iter()
+            .any(|ball| ball.escaping && ball.pos.length() - ball.radius >= arena)
+    }
+
+    fn ending(&self) -> EndingStyle {
+        EndingStyle {
+            play_out: PlayOut::Until {
+                max_seconds: ESCAPE_PLAY_OUT_MAX_SECONDS,
+            },
+            ..EndingStyle::default()
+        }
+    }
+
+    fn play_out_done(&self, state: &SimState, _substep: u64) -> bool {
+        let (left, top, right, bottom) = self.frame;
+        state.balls.iter().filter(|ball| ball.escaping).all(|ball| {
+            let (p, r) = (ball.pos, ball.radius);
+            p.x + r <= left || p.y + r <= top || p.x - r >= right || p.y - r >= bottom
+        })
     }
 }
 

@@ -15,7 +15,7 @@ mod state;
 pub use ending::{Effect, Ending, EndingStyle, PlayOut};
 pub use quality_gate::{Rejection, Verdict};
 pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
-pub use state::{Arena, Ball, SimState, Vec2};
+pub use state::{Arena, Ball, Crack, Gap, Shatter, SimState, Vec2};
 
 use crate::audio::music::Sound;
 use crate::look::{palette, Palette};
@@ -74,13 +74,11 @@ impl Simulation {
         // Ranges resolve first, before any initial-state draws.
         let (resolved, parameters) = scenario.resolve(&mut rng);
         let scenario = &resolved;
-        let rules = rules::build_all(scenario).expect("Scenario Rules were validated");
+        let mut rules = rules::build_all(scenario).expect("Scenario Rules were validated");
         let end_condition =
             end_condition::build(scenario).expect("Scenario End Condition was validated");
 
-        let mut state = SimState::new(Arena {
-            radius: scenario.arena.radius,
-        });
+        let mut state = SimState::new(Arena::new(scenario.arena.radius));
         // The ball starts somewhere in the inner half of the Arena, already moving.
         let ball = &scenario.ball;
         let max_start = (scenario.arena.radius - ball.radius) * 0.5;
@@ -92,6 +90,15 @@ impl Simulation {
             Vec2::from_angle(dir) * ball.speed,
             ball.radius,
         );
+        let mut ctx = RuleContext {
+            rng: &mut rng,
+            substep: 0,
+            dt: 1.0 / SUBSTEP_HZ as f64,
+            max_speed: ball.max_speed,
+        };
+        for rule in &mut rules {
+            rule.on_start(&mut state, &mut ctx);
+        }
 
         // Own RNG stream: choosing the sound draws nothing from `rng`.
         let sound = Sound::for_video(&scenario.sound, seed);
@@ -201,6 +208,7 @@ impl Simulation {
             rng: &mut self.rng,
             substep: self.substep,
             dt,
+            max_speed: self.max_speed,
         };
         let radius_before = self.state.arena.radius;
         for rule in &mut self.rules {
@@ -262,11 +270,16 @@ impl Simulation {
     fn measure(&mut self) {
         let arena = &self.state.arena;
         for ball in &self.state.balls {
+            self.stats.max_speed = self.stats.max_speed.max(ball.vel.length());
+            // An escaping ball has passed through the Boundary: it is meant to
+            // be outside.
+            if ball.escaping {
+                continue;
+            }
             let overshoot = ball.pos.length() + ball.radius - arena.radius;
             if overshoot > self.stats.max_boundary_overshoot {
                 self.stats.max_boundary_overshoot = overshoot;
             }
-            self.stats.max_speed = self.stats.max_speed.max(ball.vel.length());
         }
         let count = self.state.balls.len();
         if self.ball_count.last().map(|s| s.count) != Some(count) {
@@ -352,13 +365,23 @@ const RESTING_SPEED: f64 = 30.0;
 /// about the Boundary normal in the Boundary's frame. A ball resting on
 /// (outward slower than [`RESTING_SPEED`]) or already leaving the Boundary is
 /// not hitting it. Returns the hit angle on the Boundary if it hit.
+///
+/// A ball moving outward whose contact point is in a Gap is not held: it
+/// starts escaping and is never resolved against the Boundary again.
 fn resolve_boundary(ball: &mut Ball, arena: &Arena, closing_speed: f64) -> Option<f64> {
+    if ball.escaping {
+        return None;
+    }
     let limit = arena.radius - ball.radius;
     let dist = ball.pos.length();
     if dist < limit || dist == 0.0 {
         return None;
     }
     let normal = ball.pos * (1.0 / dist);
+    if ball.vel.dot(normal) > 0.0 && arena.is_open_at(normal.angle()) {
+        ball.escaping = true;
+        return None;
+    }
     ball.pos = normal * limit;
     let outward = ball.vel.dot(normal) + closing_speed;
     if outward <= 0.0 {

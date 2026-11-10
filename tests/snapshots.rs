@@ -91,11 +91,11 @@ fn changing_colour_seed_1() {
     assert_seed_1(
         "changing_colour",
         Snapshot {
-            boundary_hits: 51,
+            boundary_hits: 61,
             final_ball_count: 1,
-            end_condition: "time_cap",
-            end_substep: 14129,
-            final_state_hash: 5589162356901613303,
+            end_condition: "escaped",
+            end_substep: 18074,
+            final_state_hash: 2436270758772549950,
         },
     );
 }
@@ -133,11 +133,11 @@ fn faster_every_bounce_seed_1() {
     assert_seed_1(
         "faster_every_bounce",
         Snapshot {
-            boundary_hits: 62,
+            boundary_hits: 63,
             final_ball_count: 1,
-            end_condition: "max_speed_reached",
-            end_substep: 14852,
-            final_state_hash: 2899949589808386359,
+            end_condition: "escaped",
+            end_substep: 14962,
+            final_state_hash: 2039006523067366090,
         },
     );
 }
@@ -147,11 +147,11 @@ fn gravity_split_seed_1() {
     assert_seed_1(
         "gravity_split",
         Snapshot {
-            boundary_hits: 1499,
-            final_ball_count: 1500,
-            end_condition: "population_cap",
-            end_substep: 18384,
-            final_state_hash: 8991188671581940454,
+            boundary_hits: 3588,
+            final_ball_count: 3589,
+            end_condition: "arena_covered",
+            end_substep: 15453,
+            final_state_hash: 10685790574810927004,
         },
     );
 }

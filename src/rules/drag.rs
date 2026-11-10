@@ -1,4 +1,4 @@
-//! Drag: every ball's speed decays exponentially over time.
+//! Drag: the speed of every ball in the Arena decays exponentially over time.
 
 use serde::Deserialize;
 
@@ -29,7 +29,8 @@ impl Drag {
 impl Rule for Drag {
     fn on_substep(&mut self, state: &mut SimState, ctx: &mut RuleContext) {
         let factor = (-self.strength * ctx.dt).exp();
-        for ball in &mut state.balls {
+        // Like gravity, drag is the Arena's: an escaping ball keeps its speed.
+        for ball in state.balls.iter_mut().filter(|ball| !ball.escaping) {
             ball.vel = ball.vel * factor;
         }
     }

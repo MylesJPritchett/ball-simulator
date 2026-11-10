@@ -1,29 +1,39 @@
 # Gravity + splitting: a falling ball splits in two on every Boundary Hit,
-# and the pile of bouncing balls fills the bowl until the Population Cap.
+# and the swarm of bouncing balls fills the bowl until it is solid.
 
 name = "Gravity + splitting"
 hook_title = "Gravity is on and every bounce splits it"
 time_cap = 60.0
-population_cap = 1500
+# Covering the bowl takes ~2,600-4,000 balls; a Seed that reaches the cap
+# first covers it a moment later as the swarm keeps moving.
+population_cap = 4000
 
 [arena]
 radius = 460.0
 
 [ball]
-radius = 14.0
-speed = { min = 200.0, max = 260.0 }
+radius = 24.0
+# Bounces and splits keep a ball's speed, so every ball has the first ball's
+# energy: it must be fast enough for the strongest gravity to still let it
+# reach the top of the bowl (speed^2 > ~3 * strength * Arena radius), or the
+# top is never covered.
+speed = { min = 270.0, max = 310.0 }
 
 # Gentle gravity on purpose: stronger gravity presses balls onto the bottom
 # of the bowl, where they graze the Boundary and split every few substeps,
-# so the Population Cap arrives in ~10 s.
+# so the swarm fills the bottom in seconds and never reaches the top.
 [[rules]]
 kind = "gravity"
-strength = { min = 40.0, max = 80.0 }
+strength = { min = 40.0, max = 65.0 }
 
+# Jitter keeps children from sharing one energy and moving in step, which
+# would leave the swarm in sheets with holes between them.
 [[rules]]
 kind = "split"
 into = 2
 spread = { min = 4.0, max = 7.0 }
+speed_jitter = 0.1
+angle_jitter = 3.0
 
 # Children inherit their parent's colour, so this mixes the swarm's colours.
 [[rules]]
@@ -34,7 +44,7 @@ kind = "change_colour"
 kind = "play_note"
 
 [end_condition]
-kind = "population_cap"
+kind = "arena_covered"
 
 [look]
 counter = "ball_count"
@@ -47,6 +57,6 @@ max_duration = 50.0
 min_boundary_hits = 800
 
 [meta]
-title = "Gravity is on and every bounce splits it - {population_cap} balls?"
-description = "One falling ball splits in two on every Boundary Hit until there are {balls}. {boundary_hits} bounces in {duration} seconds."
+title = "Gravity is on and every bounce splits it - will it fill the bowl?"
+description = "One falling ball splits in two on every Boundary Hit until {balls} of them fill the whole Arena. {boundary_hits} bounces in {duration} seconds."
 hashtags = ["gravity", "split", "exponential"]

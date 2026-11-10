@@ -5,19 +5,21 @@
 //! anything that drives a `Simulation` frame by frame (the encoder, a preview
 //! window) gets identical frames, Ending effects included.
 //!
-//! Draw order: background, fading trails, Boundary, hit glows, balls, the
-//! Play-out's effect (e.g. a pop), Hook Title, Counter, then the Ending's flash
-//! over everything; a Meltdown breaks the finished frame down last. Trails and glows are clipped to the Arena (Boundary
-//! included). With Heat on, the Heat field takes the place of trails and balls.
+//! Draw order: background, fading trails, Boundary (with its cracks), hit
+//! glows, balls, the Play-out's effect (e.g. a pop), Hook Title, Counter, then
+//! the Ending's flash over everything; a Meltdown breaks the finished frame
+//! down last. Trails and glows are clipped to the Arena (Boundary included).
+//! With Heat on, the Heat field takes the place of trails and balls.
 
 mod heat;
 pub mod layout;
 mod meltdown;
+mod shatter;
 pub mod text;
 
 use tiny_skia::{
-    Color, FillRule, GradientStop, LineCap, Mask, Paint, PathBuilder, Pixmap, PixmapPaint, Point,
-    RadialGradient, Rect, Shader, SpreadMode, Stroke, Transform,
+    Color, FillRule, GradientStop, LineCap, LineJoin, Mask, Paint, PathBuilder, Pixmap,
+    PixmapPaint, Point, RadialGradient, Rect, Shader, SpreadMode, Stroke, Transform,
 };
 
 use crate::look::palette::{Palette, Rgb};
@@ -29,6 +31,9 @@ use meltdown::Meltdown;
 use text::{FittedText, TextPainter};
 
 const BOUNDARY_WIDTH: f32 = 6.0;
+/// Angle (radians) between the points of a Boundary arc drawn around a Gap:
+/// half a degree strays well under a pixel from the true circle.
+const BOUNDARY_ARC_STEP: f64 = std::f64::consts::PI / 360.0;
 /// Ending flash colour and its opacity at full strength.
 const FLASH: [u8; 3] = [255, 255, 255];
 const FLASH_MAX_ALPHA: f32 = 0.75;
@@ -69,6 +74,30 @@ fn rgb([r, g, b]: Rgb) -> Color {
 
 fn rgba([r, g, b]: Rgb, a: u8) -> Color {
     Color::from_rgba8(r, g, b, a)
+}
+
+/// Adds the Boundary arc from `start` to `end` (radians) at radius `r` (px)
+/// round `centre` to `pb` as a polyline fine enough to read as a curve, each
+/// point moved by `place`.
+fn push_arc(
+    pb: &mut PathBuilder,
+    centre: (f32, f32),
+    r: f32,
+    start: f64,
+    end: f64,
+    place: impl Fn((f32, f32)) -> (f32, f32),
+) {
+    let steps = ((end - start) / BOUNDARY_ARC_STEP).ceil().max(1.0) as usize;
+    for i in 0..=steps {
+        let angle = start + (end - start) * i as f64 / steps as f64;
+        let (sin, cos) = (angle as f32).sin_cos();
+        let (x, y) = place((centre.0 + cos * r, centre.1 + sin * r));
+        if i == 0 {
+            pb.move_to(x, y);
+        } else {
+            pb.line_to(x, y);
+        }
+    }
 }
 
 /// Mixes `colour` towards `background` (t = 0 keeps the colour).
@@ -288,21 +317,91 @@ impl Renderer {
         sim.state().arena.radius as f32 * self.scale
     }
 
+    /// The Boundary, with any Gaps left out, and its cracks; once it has
+    /// shattered, its shards (cracks and all) flying outward.
     fn draw_boundary(&mut self, sim: &Simulation, palette: &Palette) {
-        let (cx, cy) = (self.arena.center_x, self.arena.center_y);
-        let r = self.boundary_radius(sim) + BOUNDARY_WIDTH / 2.0;
-        if let Some(circle) = PathBuilder::from_circle(cx, cy, r) {
-            let mut paint = Paint {
-                anti_alias: true,
-                ..Paint::default()
-            };
-            paint.set_color(rgb(palette.boundary));
+        let centre = (self.arena.center_x, self.arena.center_y);
+        let inner = self.boundary_radius(sim);
+        let r = inner + BOUNDARY_WIDTH / 2.0;
+        let arena = &sim.state().arena;
+        let shards = arena.shatter.map(|shatter| {
+            let elapsed = sim.substep().saturating_sub(shatter.substep) as f32 / SUBSTEP_HZ as f32;
+            shatter::shards(&shatter, centre, r, elapsed)
+        });
+        let path = match &shards {
+            None if arena.gaps.is_empty() => PathBuilder::from_circle(centre.0, centre.1, r),
+            None => {
+                let mut pb = PathBuilder::new();
+                for (start, end) in arena.solid_arcs() {
+                    push_arc(&mut pb, centre, r, start, end, |p| p);
+                }
+                pb.finish()
+            }
+            Some(shards) => {
+                let mut pb = PathBuilder::new();
+                for shard in shards {
+                    push_arc(&mut pb, centre, r, shard.start, shard.end, |p| {
+                        shard.place(p)
+                    });
+                }
+                pb.finish()
+            }
+        };
+        let mut paint = Paint {
+            anti_alias: true,
+            ..Paint::default()
+        };
+        paint.set_color(rgb(palette.boundary));
+        if let Some(path) = path {
             let stroke = Stroke {
                 width: BOUNDARY_WIDTH,
                 ..Stroke::default()
             };
             self.pixmap
-                .stroke_path(&circle, &paint, &stroke, Transform::identity(), None);
+                .stroke_path(&path, &paint, &stroke, Transform::identity(), None);
+        }
+
+        // Trunks and branches, each as one path.
+        let (mut trunks, mut branches) = (PathBuilder::new(), PathBuilder::new());
+        for crack in &arena.cracks {
+            let shard = match &shards {
+                // A crack in the space between two shards went with neither.
+                Some(shards) => match shards.iter().find(|s| s.holds(crack.angle)) {
+                    Some(shard) => Some(shard),
+                    None => continue,
+                },
+                None => None,
+            };
+            let place = |p| shard.map_or(p, |s| s.place(p));
+            for (i, line) in shatter::crack_lines(crack, centre, inner)
+                .iter()
+                .enumerate()
+            {
+                let pb = if i == 0 { &mut trunks } else { &mut branches };
+                for (k, &point) in line.iter().enumerate() {
+                    let (x, y) = place(point);
+                    if k == 0 {
+                        pb.move_to(x, y);
+                    } else {
+                        pb.line_to(x, y);
+                    }
+                }
+            }
+        }
+        for (pb, width) in [
+            (trunks, shatter::TRUNK_WIDTH),
+            (branches, shatter::BRANCH_WIDTH),
+        ] {
+            if let Some(path) = pb.finish() {
+                let stroke = Stroke {
+                    width,
+                    line_cap: LineCap::Round,
+                    line_join: LineJoin::Round,
+                    ..Stroke::default()
+                };
+                self.pixmap
+                    .stroke_path(&path, &paint, &stroke, Transform::identity(), None);
+            }
         }
     }
 

@@ -7,28 +7,39 @@ use support::{run, MINIMAL};
 
 const ARENA_COVERED_END: &str = "\n[end_condition]\nkind = \"arena_covered\"\n";
 
-/// A still ball of radius 400 while the Arena shrinks from 460 at 10 units/s.
-/// The ball stays inside the Arena, so it covers (400 / R)^2 of it: 98% at
-/// R = 400 / sqrt(0.98) = 404.06, which the Boundary reaches after 5.594 s.
-fn still_ball_in_a_shrinking_arena() -> String {
+/// A ball of radius 400 resting on the bottom of an Arena that shrinks from
+/// 460 at 10 units/s. Light gravity settles it onto the Boundary within 5 s
+/// whatever the Seed, without bouncing, and it then rides the Boundary in.
+fn resting_ball_in_a_shrinking_arena() -> String {
     MINIMAL
         .replace("time_cap = 5.0", "time_cap = 10.0")
         .replace("radius = 30.0", "radius = 400.0")
         .replace("speed = 900.0", "speed = 0.0")
+        + "\n[[rules]]\nkind = \"gravity\"\nstrength = 4.0\n"
         + "\n[[rules]]\nkind = \"shrinking_arena\"\nrate = 10.0\nmin_radius = 300.0\n"
 }
 
 #[test]
-fn arena_covered_fires_once_the_balls_cover_98_percent_of_the_arena() {
-    let record = run(&(still_ball_in_a_shrinking_arena() + ARENA_COVERED_END), 1);
+fn arena_covered_fires_once_the_balls_cover_98_percent_inside_the_rim_margin() {
+    // Coverage is measured inside the rim margin, a circle of 0.98 R. The
+    // ball (offset R - 400 from the centre) covers 98% of that circle at
+    // R = 409.87 (circle-circle intersection, worked out by hand), which the
+    // Boundary reaches after 5.013 s. Ignoring the margin, the ball would
+    // need R = 400 / sqrt(0.98) = 404.06, at 5.594 s.
+    for seed in 0..5 {
+        let record = run(
+            &(resting_ball_in_a_shrinking_arena() + ARENA_COVERED_END),
+            seed,
+        );
 
-    // Neither early nor late by more than 0.2 units of Boundary (~0.1% coverage).
-    assert_eq!(record.end.condition, "arena_covered");
-    assert!(
-        (record.end.time() - 5.594).abs() < 0.02,
-        "fired at {} s",
-        record.end.time()
-    );
+        // Neither early nor late by more than 0.2 units of Boundary (~0.1% coverage).
+        assert_eq!(record.end.condition, "arena_covered", "seed {seed}");
+        assert!(
+            (record.end.time() - 5.013).abs() < 0.02,
+            "seed {seed}: fired at {} s",
+            record.end.time()
+        );
+    }
 }
 
 #[test]

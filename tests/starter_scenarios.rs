@@ -62,6 +62,26 @@ fn doubling_alone_ships_with_heat() {
 }
 
 #[test]
+fn changing_colour_ends_when_its_ball_escapes_through_a_gap() {
+    let (_, scenario) = shipped()
+        .into_iter()
+        .find(|(_, s)| s.id == "changing_colour")
+        .expect("changing_colour ships");
+
+    assert!(scenario.rules.iter().any(|rule| rule.kind == "gap"));
+    assert_eq!(scenario.end_condition.kind, "escaped");
+    assert!(
+        scenario.hook_title.contains("escapes"),
+        "{}",
+        scenario.hook_title
+    );
+    let title = scenario.meta.title.as_deref().unwrap_or_default();
+    assert!(title.contains("escape"), "{title}");
+    let record = sim::run(&scenario, 1);
+    assert_eq!(record.end.condition, "escaped");
+}
+
+#[test]
 fn every_shipped_scenario_has_metadata_templates() {
     for (path, scenario) in shipped() {
         let meta = &scenario.meta;

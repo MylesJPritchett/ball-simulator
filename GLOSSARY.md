@@ -66,6 +66,9 @@ _Avoid_: Wall, edge
 **Gap**:
 An opening in the Boundary that balls pass through instead of bouncing off.
 
+**Escape**:
+A ball passing out through an opening a Rule made in the Boundary (such as a Gap). An escaping ball is no longer held by the Boundary or pulled by gravity and drag, so it flies straight out of the frame.
+
 **Boundary Hit**:
 A ball touching the Boundary; the default trigger for sounds and on-hit Rules. Balls pass through each other unless a Rule says otherwise.
 _Avoid_: Collision, bounce, edge hit

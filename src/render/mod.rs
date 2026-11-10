@@ -27,6 +27,9 @@ use heat::Heat;
 use text::{FittedText, TextPainter};
 
 const BOUNDARY_WIDTH: f32 = 6.0;
+/// Angle (radians) between the points of a Boundary arc drawn around a Gap:
+/// half a degree strays well under a pixel from the true circle.
+const BOUNDARY_ARC_STEP: f64 = std::f64::consts::PI / 360.0;
 /// Ending flash colour and its opacity at full strength.
 const FLASH: [u8; 3] = [255, 255, 255];
 const FLASH_MAX_ALPHA: f32 = 0.75;
@@ -280,10 +283,32 @@ impl Renderer {
         sim.state().arena.radius as f32 * self.scale
     }
 
+    /// The Boundary, with any Gaps left out.
     fn draw_boundary(&mut self, sim: &Simulation, palette: &Palette) {
         let (cx, cy) = (self.arena.center_x, self.arena.center_y);
         let r = self.boundary_radius(sim) + BOUNDARY_WIDTH / 2.0;
-        if let Some(circle) = PathBuilder::from_circle(cx, cy, r) {
+        let arena = &sim.state().arena;
+        let path = if arena.gaps.is_empty() {
+            PathBuilder::from_circle(cx, cy, r)
+        } else {
+            // Each solid arc as a polyline, fine enough to read as a curve.
+            let mut pb = PathBuilder::new();
+            for (start, end) in arena.solid_arcs() {
+                let steps = ((end - start) / BOUNDARY_ARC_STEP).ceil().max(1.0) as usize;
+                for i in 0..=steps {
+                    let angle = start + (end - start) * i as f64 / steps as f64;
+                    let (sin, cos) = (angle as f32).sin_cos();
+                    let (x, y) = (cx + cos * r, cy + sin * r);
+                    if i == 0 {
+                        pb.move_to(x, y);
+                    } else {
+                        pb.line_to(x, y);
+                    }
+                }
+            }
+            pb.finish()
+        };
+        if let Some(path) = path {
             let mut paint = Paint {
                 anti_alias: true,
                 ..Paint::default()
@@ -294,7 +319,7 @@ impl Renderer {
                 ..Stroke::default()
             };
             self.pixmap
-                .stroke_path(&circle, &paint, &stroke, Transform::identity(), None);
+                .stroke_path(&path, &paint, &stroke, Transform::identity(), None);
         }
     }
 

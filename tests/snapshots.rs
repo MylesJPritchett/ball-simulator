@@ -91,11 +91,11 @@ fn changing_colour_seed_1() {
     assert_seed_1(
         "changing_colour",
         Snapshot {
-            boundary_hits: 51,
+            boundary_hits: 61,
             final_ball_count: 1,
-            end_condition: "time_cap",
-            end_substep: 14129,
-            final_state_hash: 5589162356901613303,
+            end_condition: "escaped",
+            end_substep: 18074,
+            final_state_hash: 2436270758772549950,
         },
     );
 }

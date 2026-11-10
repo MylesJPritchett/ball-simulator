@@ -10,6 +10,7 @@
 
 mod change_colour;
 mod drag;
+mod gap;
 mod gravity;
 mod grow;
 mod play_note;
@@ -34,6 +35,7 @@ pub const SPLIT: &str = "split";
 pub const GROW: &str = "grow";
 pub const SHRINK: &str = "shrink";
 pub const PLAY_NOTE: &str = "play_note";
+pub const GAP: &str = "gap";
 
 /// Per-call context handed to Rules by the simulation.
 pub struct RuleContext<'a> {
@@ -47,10 +49,22 @@ pub struct RuleContext<'a> {
 
 /// One Rule's hooks into the simulation. All hooks default to doing nothing.
 ///
-/// Order within a substep: `on_substep` for every Rule (in Scenario order),
+/// `on_start` runs once for every Rule (in Scenario order) before anything
+/// else. Order within a substep: `on_substep` for every Rule (in Scenario order),
 /// then integration and Boundary resolution for every ball, then
 /// `on_boundary_hit` for each Boundary Hit (in ball order, Rules in Scenario order).
 pub trait Rule {
+    /// Whether this Rule can let a ball out of the Arena, by opening the
+    /// Boundary (adding to `state.arena.gaps`) or marking a ball `escaping`.
+    /// The `escaped` End Condition needs at least one such Rule.
+    fn lets_balls_out(&self) -> bool {
+        false
+    }
+
+    /// Called once when the simulation starts, after the first ball is
+    /// placed and before the first frame (e.g. to open a Gap).
+    fn on_start(&mut self, _state: &mut SimState, _ctx: &mut RuleContext) {}
+
     /// Called once per substep before balls move (forces, Arena changes, ...).
     fn on_substep(&mut self, _state: &mut SimState, _ctx: &mut RuleContext) {}
 
@@ -80,6 +94,7 @@ pub fn build(spec: &RuleSpec) -> Result<Box<dyn Rule>, String> {
         GROW => Ok(Box::new(grow::Grow::from_spec(spec)?)),
         SHRINK => Ok(Box::new(shrink::Shrink::from_spec(spec)?)),
         PLAY_NOTE => Ok(Box::new(play_note::PlayNote::from_spec(spec)?)),
+        GAP => Ok(Box::new(gap::Gap::from_spec(spec)?)),
         other => Err(format!("unknown Rule '{other}'")),
     }
 }

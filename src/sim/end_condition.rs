@@ -20,6 +20,7 @@ pub const MAX_SPEED_REACHED: &str = "max_speed_reached";
 pub const MIN_RADIUS_REACHED: &str = "min_radius_reached";
 pub const ARENA_MIN_REACHED: &str = "arena_min_reached";
 pub const VANISHED: &str = "vanished";
+pub const ESCAPED: &str = "escaped";
 
 pub trait EndCondition {
     /// Id written to `SimRecord::end.condition`.
@@ -77,6 +78,17 @@ pub fn build(scenario: &Scenario) -> Result<Option<Box<dyn EndCondition>>, Strin
         VANISHED => {
             no_params(spec)?;
             Ok(Some(Box::new(Vanished)))
+        }
+        ESCAPED => {
+            no_params(spec)?;
+            let rules = crate::rules::build_all(scenario)?;
+            if !rules.iter().any(|rule| rule.lets_balls_out()) {
+                return Err(format!(
+                    "End Condition '{ESCAPED}' needs a Rule that can let a ball out (e.g. '{}')",
+                    crate::rules::GAP
+                ));
+            }
+            Ok(Some(Box::new(Escaped::new(scenario.arena.radius))))
         }
         other => Err(format!("unknown End Condition '{other}'")),
     }
@@ -294,5 +306,71 @@ impl EndCondition for Vanished {
             effect: Effect::Pop,
             ..EndingStyle::default()
         }
+    }
+}
+
+/// The longest an escape plays out, should the ball be too slow to leave the
+/// frame.
+pub const ESCAPE_PLAY_OUT_MAX_SECONDS: f64 = 3.0;
+
+/// A ball has escaped: it is fully outside the Arena, through a Gap or
+/// whatever else a Rule opened in the Boundary. The Play-out runs until every
+/// escaping ball has left the Video frame.
+struct Escaped {
+    /// The Video frame in simulation units, as (left, top, right, bottom)
+    /// around the Arena's centre.
+    frame: (f64, f64, f64, f64),
+}
+
+impl Escaped {
+    /// `arena_radius` is the Arena's starting radius, which the renderer
+    /// scales to the laid-out Arena.
+    fn new(arena_radius: f64) -> Self {
+        let arena = crate::render::layout::arena();
+        let scale = arena_radius / arena.radius as f64;
+        let (cx, cy) = (arena.center_x as f64, arena.center_y as f64);
+        let (width, height) = (
+            crate::render::layout::WIDTH as f64,
+            crate::render::layout::HEIGHT as f64,
+        );
+        Escaped {
+            frame: (
+                -cx * scale,
+                -cy * scale,
+                (width - cx) * scale,
+                (height - cy) * scale,
+            ),
+        }
+    }
+}
+
+impl EndCondition for Escaped {
+    fn id(&self) -> &'static str {
+        ESCAPED
+    }
+
+    fn is_met(&self, state: &SimState, _substep: u64) -> bool {
+        let arena = state.arena.radius;
+        state
+            .balls
+            .iter()
+            .any(|ball| ball.escaping && ball.pos.length() - ball.radius >= arena)
+    }
+
+    fn ending(&self) -> EndingStyle {
+        EndingStyle {
+            play_out: PlayOut::Until {
+                max_seconds: ESCAPE_PLAY_OUT_MAX_SECONDS,
+            },
+            ..EndingStyle::default()
+        }
+    }
+
+    fn play_out_done(&self, state: &SimState, _substep: u64) -> bool {
+        let (left, top, right, bottom) = self.frame;
+        state.balls.iter().filter(|ball| ball.escaping).all(|ball| {
+            let (p, r) = (ball.pos, ball.radius);
+            p.x + r <= left || p.y + r <= top || p.x - r >= right || p.y - r >= bottom
+        })
     }
 }

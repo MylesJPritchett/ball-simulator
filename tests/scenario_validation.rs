@@ -130,3 +130,55 @@ fn shrink_has_no_minimum_radius() {
         "{err}"
     );
 }
+
+#[test]
+fn escaped_needs_a_rule_that_can_let_a_ball_out() {
+    let toml = format!("{MINIMAL}\n[end_condition]\nkind = \"escaped\"\n");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("broken")
+            && err.contains(
+                "end_condition: End Condition 'escaped' needs a Rule that can let a ball out"
+            ),
+        "{err}"
+    );
+}
+
+#[test]
+fn escaped_with_a_gap_is_valid() {
+    let toml = format!(
+        "{MINIMAL}\n[[rules]]\nkind = \"gap\"\nwidth = 40.0\nrotation_speed = 10.0\n\
+         \n[end_condition]\nkind = \"escaped\"\n"
+    );
+    Scenario::from_toml_str("ok", &toml).expect("escaped with a gap is valid");
+}
+
+#[test]
+fn bad_gap_parameters_are_named_in_the_error() {
+    for (params, expected) in [
+        (
+            "width = 0.0\nrotation_speed = 0.0",
+            "'gap': width must be a finite number > 0, got 0",
+        ),
+        (
+            "width = 400.0\nrotation_speed = 0.0",
+            "'gap': width must be at most 360 degrees, got 400",
+        ),
+        (
+            "width = 30.0\nrotation_speed = inf",
+            "'gap': rotation_speed must be a finite number, got inf",
+        ),
+        ("width = 30.0", "missing field `rotation_speed`"),
+        (
+            "width = 30.0\nrotation_speed = 0.0\nspin = 1.0",
+            "unknown field `spin`",
+        ),
+    ] {
+        let toml = format!("{}\n[[rules]]\nkind = \"gap\"\n{params}\n", complete());
+        let err = error_for(&toml);
+        assert!(
+            err.contains("rules[0]") && err.contains(expected),
+            "{params}: {err}"
+        );
+    }
+}

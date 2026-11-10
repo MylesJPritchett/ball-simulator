@@ -367,3 +367,55 @@ fn the_same_seed_gives_the_same_record_frames_and_samples_with_a_play_out() {
     assert!(first.1 == second.1, "same frames");
     assert!(first.2 == second.2, "same samples");
 }
+
+#[test]
+fn the_boundary_is_drawn_with_the_gap_missing_and_the_gap_turns() {
+    // A slow ball that stays clear of the Boundary, and a 60-degree Gap
+    // turning 90 degrees a second.
+    let toml = MINIMAL.replace("speed = 900.0", "speed = 10.0")
+        + "\n[[rules]]\nkind = \"gap\"\nwidth = 60.0\nrotation_speed = 90.0\n\
+           \n[look]\ntrails = false\nglow = false\n";
+    let arena = layout::arena();
+    let on_boundary = |frame: &[u8], angle: f64| {
+        let r = arena.radius + BOUNDARY_WIDTH / 2.0;
+        let (sin, cos) = (angle as f32).sin_cos();
+        pixel(frame, arena.center_x + cos * r, arena.center_y + sin * r)
+    };
+    let mut start = 0.0;
+    draw_frames(&toml, 1, 61, |sim, frame| {
+        let palette = sim.palette();
+        let gap = sim.state().arena.gaps[0].angle;
+        if sim.substep() == 0 {
+            start = gap;
+        }
+        if sim.substep() % SUBSTEP_HZ != 0 {
+            return;
+        }
+        for off in [-25.0f64, 0.0, 25.0] {
+            assert_eq!(
+                on_boundary(frame, gap + off.to_radians()),
+                palette.background,
+                "substep {}: drawn {off} degrees into the Gap",
+                sim.substep()
+            );
+        }
+        for off in [-40.0f64, 40.0, 90.0, 180.0, 270.0] {
+            assert_eq!(
+                on_boundary(frame, gap + off.to_radians()),
+                palette.boundary,
+                "substep {}: missing {off} degrees from the Gap",
+                sim.substep()
+            );
+        }
+    });
+    // One second in, the Gap has turned a quarter turn from where it began:
+    // the Boundary is back where it was open.
+    let mut last = Vec::new();
+    draw_frames(&toml, 1, 61, |_, frame| last = frame.to_vec());
+    let palette = Simulation::new(&scenario(&toml), 1).palette();
+    assert_eq!(on_boundary(&last, start), palette.boundary);
+    assert_eq!(
+        on_boundary(&last, start + 90f64.to_radians()),
+        palette.background
+    );
+}

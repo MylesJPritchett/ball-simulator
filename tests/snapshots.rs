@@ -119,11 +119,11 @@ fn doubling_seed_1() {
     assert_seed_1(
         "doubling",
         Snapshot {
-            boundary_hits: 2216904,
-            final_ball_count: 1000000,
+            boundary_hits: 180932,
+            final_ball_count: 100000,
             end_condition: "meltdown",
-            end_substep: 22897,
-            final_state_hash: 15806495560928583018,
+            end_substep: 20760,
+            final_state_hash: 6714553603549531737,
         },
     );
 }

@@ -4,8 +4,10 @@
 //! The soundtrack is a pure function of the record: pitches were assigned by
 //! the simulation (see [`music`]), and this module only schedules Voices,
 //! renders them with the record's instrument, adds the final chord, then
-//! applies a light reverb and a limiter.
+//! applies a light reverb and a limiter. A Meltdown crackles, stutters and
+//! cuts to silence instead of ending on the chord (see [`meltdown`]).
 
+mod meltdown;
 mod mix;
 pub mod music;
 mod synth;
@@ -13,7 +15,7 @@ mod wav;
 
 pub use wav::write_wav;
 
-use crate::sim::{SimRecord, SUBSTEP_HZ};
+use crate::sim::{Effect, SimRecord, SUBSTEP_HZ};
 
 pub const SAMPLE_RATE: u32 = 48_000;
 /// 48 kHz / 480 Hz: every substep lands exactly on a sample boundary.
@@ -133,5 +135,14 @@ pub fn synthesize(record: &SimRecord) -> Vec<f32> {
             &mut dry[voice.start..voice.end],
         );
     }
-    mix::limit(&mix::reverb(&dry))
+    let ending = &record.ending;
+    let meltdown = ending.effect == Effect::Meltdown;
+    if meltdown {
+        meltdown::crackle(&mut dry, ending, record.seed);
+    }
+    let mut out = mix::limit(&mix::reverb(&dry));
+    if meltdown {
+        meltdown::stutter_and_cut(&mut out, ending, record.seed);
+    }
+    out
 }

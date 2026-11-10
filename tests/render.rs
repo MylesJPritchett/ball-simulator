@@ -367,3 +367,93 @@ fn the_same_seed_gives_the_same_record_frames_and_samples_with_a_play_out() {
     assert!(first.1 == second.1, "same frames");
     assert!(first.2 == second.2, "same samples");
 }
+
+/// One ball that splits in two on every Boundary Hit and melts down once
+/// there are 20. Trails and glows off, so the plain frames are just the balls.
+fn melting() -> String {
+    MINIMAL.replace("time_cap = 5.0", "time_cap = 5.0\npopulation_cap = 20")
+        + "\n[[rules]]\nkind = \"split\"\ninto = 2\nspread = 40.0\n\n\
+           [end_condition]\nkind = \"meltdown\"\n\n[look]\ntrails = false\nglow = false\n"
+}
+
+/// The hash of every frame of `melting()` with Seed `seed`, drawn with the
+/// run's Ending as `effect` changes it.
+fn melting_frames(seed: u64, effect: Effect) -> Vec<u64> {
+    let toml = melting();
+    let frames = support::run(&toml, seed).ending.frames();
+    let mut out = Vec::new();
+    draw_frames_with(
+        &toml,
+        seed,
+        frames,
+        |e| Ending { effect, ..e },
+        |_, f| out.push(frame_hash(f)),
+    );
+    out
+}
+
+#[test]
+fn the_meltdown_stutters_longer_and_longer_glitches_and_cuts_to_a_broken_frame() {
+    let ending = support::run(&melting(), 1).ending;
+    let melted = melting_frames(1, Effect::Meltdown);
+    let plain = melting_frames(1, Effect::None);
+    let frame_of = |substep: u64| substep.div_ceil(SUBSTEPS_PER_FRAME) as usize;
+    let (first, freeze) = (
+        frame_of(ending.start_substep),
+        frame_of(ending.freeze_substep),
+    );
+
+    for k in 0..first {
+        assert!(
+            melted[k] == plain[k],
+            "frame {k}: nothing before the Meltdown"
+        );
+    }
+    for k in first..melted.len() {
+        assert!(melted[k] != plain[k], "frame {k}: glitched or stuck");
+    }
+
+    // The balls keep moving through the Play-out, but frames repeat: runs of
+    // identical frames that get longer.
+    for k in first + 1..freeze {
+        assert!(plain[k] != plain[k - 1], "frame {k}: the action moves");
+    }
+    let mut runs = vec![1];
+    for k in first + 1..freeze {
+        if melted[k] == melted[k - 1] {
+            *runs.last_mut().unwrap() += 1;
+        } else {
+            runs.push(1);
+        }
+    }
+    assert!(runs.len() >= 4, "several stutters: {runs:?}");
+    // The last run may be cut short by the freeze.
+    let half = runs.len() / 2;
+    let mean = |r: &[usize]| r.iter().sum::<usize>() as f64 / r.len() as f64;
+    let (early, late) = (mean(&runs[..half]), mean(&runs[half..runs.len() - 1]));
+    assert!(late > early, "the stutter lengthens: {runs:?}");
+
+    // The hold is one frozen broken frame.
+    for k in freeze + 1..melted.len() {
+        assert!(
+            melted[k] == melted[freeze],
+            "frame {k}: the broken frame holds"
+        );
+    }
+}
+
+#[test]
+fn the_same_seed_gives_the_same_record_frames_and_samples_with_the_meltdown() {
+    let video = || {
+        let record = support::run(&melting(), 1);
+        let frames = melting_frames(1, record.ending.effect);
+        let samples = ball_simulator::audio::synthesize(&record);
+        (record, frames, samples)
+    };
+    let (first, second) = (video(), video());
+
+    assert_eq!(first.0.ending.effect, Effect::Meltdown);
+    assert_eq!(first.0, second.0);
+    assert!(first.1 == second.1, "same frames");
+    assert!(first.2 == second.2, "same samples");
+}

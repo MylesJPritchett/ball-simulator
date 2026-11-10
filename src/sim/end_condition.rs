@@ -20,6 +20,7 @@ pub const MAX_SPEED_REACHED: &str = "max_speed_reached";
 pub const MIN_RADIUS_REACHED: &str = "min_radius_reached";
 pub const ARENA_MIN_REACHED: &str = "arena_min_reached";
 pub const VANISHED: &str = "vanished";
+pub const MELTDOWN: &str = "meltdown";
 
 pub trait EndCondition {
     /// Id written to `SimRecord::end.condition`.
@@ -77,6 +78,12 @@ pub fn build(scenario: &Scenario) -> Result<Option<Box<dyn EndCondition>>, Strin
         VANISHED => {
             no_params(spec)?;
             Ok(Some(Box::new(Vanished)))
+        }
+        MELTDOWN => {
+            no_params(spec)?;
+            Ok(Some(Box::new(Meltdown {
+                cap: scenario.population_cap,
+            })))
         }
         other => Err(format!("unknown End Condition '{other}'")),
     }
@@ -293,6 +300,38 @@ impl EndCondition for Vanished {
             },
             effect: Effect::Pop,
             ..EndingStyle::default()
+        }
+    }
+}
+
+/// How long the Meltdown plays out before the cut to its broken frame.
+pub const MELTDOWN_SECONDS: f64 = 1.5;
+
+/// The ball count has reached the Scenario's Population Cap and the Video
+/// appears to break down under its own load. Staged, not real: rendering is
+/// offline (ADR 0001), so the renderer and audio draw the breakdown from the
+/// Seed. No flash and no final chord, so the crash does not resolve neatly.
+struct Meltdown {
+    cap: usize,
+}
+
+impl EndCondition for Meltdown {
+    fn id(&self) -> &'static str {
+        MELTDOWN
+    }
+
+    fn is_met(&self, state: &SimState, _substep: u64) -> bool {
+        state.balls.len() >= self.cap
+    }
+
+    fn ending(&self) -> EndingStyle {
+        EndingStyle {
+            play_out: PlayOut::For {
+                seconds: MELTDOWN_SECONDS,
+            },
+            flash: false,
+            final_chord: false,
+            effect: Effect::Meltdown,
         }
     }
 }

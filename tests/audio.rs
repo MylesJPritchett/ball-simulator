@@ -178,11 +178,12 @@ fn pinned_instrument_scale_and_pitch_mode_are_respected() {
     }
 }
 
-/// The shipped doubling Scenario: thousands of hits from up to 2000 balls.
+/// The shipped doubling Scenario capped at 2000 balls: thousands of hits.
 fn doubling(seed: u64, instrument: &str) -> SimRecord {
     let toml = format!(
         "{}\n[sound]\ninstrument = \"{instrument}\"\n",
         include_str!("../scenarios/doubling.toml")
+            .replace("population_cap = 1000000", "population_cap = 2000")
     );
     run(&toml, seed)
 }
@@ -253,6 +254,84 @@ fn the_final_chord_plays_when_a_ball_vanishes_not_at_the_freeze() {
 
     let chord = voices(&record).iter().filter(|v| v.start == fired).count();
     assert!(chord >= 3, "chord has {chord} notes");
+}
+
+/// One ball that splits in two on every Boundary Hit and melts down once
+/// there are 50, with `rules` added.
+fn melting(rules: &str) -> String {
+    MINIMAL.replace("time_cap = 5.0", "time_cap = 5.0\npopulation_cap = 50")
+        + "\n[[rules]]\nkind = \"split\"\ninto = 2\nspread = 40.0\n"
+        + rules
+        + "\n[end_condition]\nkind = \"meltdown\"\n"
+}
+
+/// Sample index of a substep.
+fn sample_of(substep: u64) -> usize {
+    (substep * ball_simulator::audio::SAMPLES_PER_SUBSTEP) as usize
+}
+
+#[test]
+fn the_meltdown_has_no_final_chord() {
+    use ball_simulator::audio::voices;
+    // No Rule plays a note, so any Voice would be the chord.
+    let record = run(&melting(""), 3);
+    assert_eq!(record.end.condition, "meltdown");
+    assert!(voices(&record).is_empty(), "{:?}", voices(&record));
+}
+
+#[test]
+fn the_meltdown_crackles_through_its_play_out_then_cuts_to_silence() {
+    use ball_simulator::audio::synthesize;
+    let record = run(&melting(""), 3);
+    let samples = synthesize(&record);
+    let (start, freeze) = (
+        sample_of(record.ending.start_substep),
+        sample_of(record.ending.freeze_substep),
+    );
+
+    assert!(samples[..start].iter().all(|&s| s == 0.0), "silent before");
+    let crackle = &samples[start..freeze];
+    let loud = crackle.iter().filter(|s| s.abs() > 0.05).count();
+    assert!(loud > 100, "only {loud} crackling samples");
+    // Crackle all the way through, not just at the start.
+    let tail = &crackle[crackle.len() * 3 / 4..];
+    assert!(tail.iter().any(|s| s.abs() > 0.05), "crackles to the end");
+    assert!(samples[freeze..].iter().all(|&s| s == 0.0), "a hard cut");
+}
+
+/// Whether some stretch of `samples` (at least 10 ms of sound) repeats the
+/// stretch just before it, with a lag of 5-200 ms.
+fn repeats_a_stretch(samples: &[f32]) -> bool {
+    use ball_simulator::audio::SAMPLE_RATE;
+    let ms = SAMPLE_RATE as usize / 1000;
+    (5 * ms..200 * ms).any(|lag| {
+        let mut run = 0;
+        for i in lag..samples.len() {
+            if samples[i] == samples[i - lag] && samples[i] != 0.0 {
+                run += 1;
+                if run >= 10 * ms {
+                    return true;
+                }
+            } else if samples[i] != samples[i - lag] {
+                run = 0;
+            }
+        }
+        false
+    })
+}
+
+#[test]
+fn the_meltdown_stutters_the_soundtrack_during_its_play_out() {
+    use ball_simulator::audio::synthesize;
+    let record = run(&melting("[[rules]]\nkind = \"play_note\"\n"), 3);
+    let samples = synthesize(&record);
+    let (start, freeze) = (
+        sample_of(record.ending.start_substep),
+        sample_of(record.ending.freeze_substep),
+    );
+
+    assert!(!repeats_a_stretch(&samples[..start]), "no stutter before");
+    assert!(repeats_a_stretch(&samples[start..freeze]), "a stutter");
 }
 
 #[test]

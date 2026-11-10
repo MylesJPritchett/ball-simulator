@@ -78,6 +78,9 @@ pub enum Effect {
     None,
     /// An expanding, fading ring where each vanished ball was.
     Pop,
+    /// The Video appears to break down: frames stutter, tear and split into
+    /// colour channels, then cut to a frozen broken frame for the hold.
+    Meltdown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]

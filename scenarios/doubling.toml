@@ -1,20 +1,21 @@
 # Every bounce it doubles: each Boundary Hit splits a ball in two, fanned
-# around its bounce, until the Population Cap is reached.
+# around its bounce, glowing hotter with Heat until white-hot at the
+# Population Cap, where the Video melts down.
 
 name = "Doubling"
-hook_title = "Every bounce it doubles"
+hook_title = "Every bounce it doubles — until it breaks"
 time_cap = 60.0
-population_cap = 2000
+population_cap = 1000000
 
 [arena]
 radius = 460.0
 
 [ball]
 radius = 16.0
-speed = { min = 230.0, max = 270.0 }
+speed = { min = 265.0, max = 310.0 }
 
 # A narrow fan keeps the children's chords long; wider fans reach the cap
-# much sooner (spread 20 -> ~16 s, spread 12 -> ~20-33 s at this speed).
+# much sooner. At this speed the cap comes at ~36-58 s (Video ~38-61 s).
 [[rules]]
 kind = "split"
 into = 2
@@ -25,21 +26,23 @@ spread = { min = 7.0, max = 10.0 }
 kind = "play_note"
 
 [end_condition]
-kind = "population_cap"
+kind = "meltdown"
 
-# Heat: overlaps glow hotter, reaching white-hot at the Population Cap.
+# Heat: overlaps glow hotter, reaching white-hot at the Population Cap. Ember
+# pins the ramp to red -> orange -> white.
 [look]
+palette = "ember"
 counter = "ball_count"
 heat = true
 
 # Seeds outside these are rejected and replaced. Durations are Video length
-# in seconds (action plus the ~1.5 s ending hold).
+# in seconds (action plus the Meltdown's Play-out and hold).
 [quality_gate]
 min_duration = 25.0
-max_duration = 50.0
+max_duration = 55.0
 min_boundary_hits = 1000
 
 [meta]
-title = "Every bounce it doubles - can it reach {population_cap}?"
-description = "One ball splits in two on every Boundary Hit until there are {balls}. {boundary_hits} bounces, one note each."
+title = "Every bounce it doubles - until it breaks at {population_cap}"
+description = "One ball splits in two on every Boundary Hit until there are {balls} and it melts down. {boundary_hits} bounces, one note each."
 hashtags = ["doubling", "exponential", "split"]

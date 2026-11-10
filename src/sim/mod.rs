@@ -124,6 +124,11 @@ impl Simulation {
         }
     }
 
+    /// The Video's Seed.
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+
     pub fn state(&self) -> &SimState {
         &self.state
     }

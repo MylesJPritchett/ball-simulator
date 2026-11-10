@@ -137,9 +137,13 @@ fn shipped_doubling_metadata_names_its_population_cap() {
     let scenario = Scenario::from_file(&path).unwrap();
     let meta = VideoMeta::new(&scenario, &sim::run(&scenario, 1));
 
-    assert_eq!(meta.title, "Every bounce it doubles - can it reach 2000?");
+    assert_eq!(
+        meta.title,
+        "Every bounce it doubles - until it breaks at 1000000"
+    );
     assert!(
-        meta.description.contains("until there are 2000."),
+        meta.description
+            .contains("until there are 1000000 and it melts down."),
         "{}",
         meta.description
     );

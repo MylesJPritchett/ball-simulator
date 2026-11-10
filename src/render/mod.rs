@@ -7,11 +7,12 @@
 //!
 //! Draw order: background, fading trails, Boundary, hit glows, balls, the
 //! Play-out's effect (e.g. a pop), Hook Title, Counter, then the Ending's flash
-//! over everything. Trails and glows are clipped to the Arena (Boundary
+//! over everything; a Meltdown breaks the finished frame down last. Trails and glows are clipped to the Arena (Boundary
 //! included). With Heat on, the Heat field takes the place of trails and balls.
 
 mod heat;
 pub mod layout;
+mod meltdown;
 pub mod text;
 
 use tiny_skia::{
@@ -24,6 +25,7 @@ use crate::look::{Counter, LookSpec};
 use crate::scenario::Scenario;
 use crate::sim::{Ball, Effect, Ending, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
 use heat::Heat;
+use meltdown::Meltdown;
 use text::{FittedText, TextPainter};
 
 const BOUNDARY_WIDTH: f32 = 6.0;
@@ -93,6 +95,8 @@ pub struct Renderer {
     last_pos: Vec<Option<(f32, f32)>>,
     /// Ball overlap density, drawn instead of trails and balls when on.
     heat: Option<Heat>,
+    /// The frame the Meltdown is holding, if it is under way.
+    meltdown: Meltdown,
     glow: bool,
     /// Render time of the next frame, in substeps. It keeps running through
     /// the ending's hold while the simulation is frozen, so glows fade out
@@ -129,6 +133,7 @@ impl Renderer {
                 .then(|| Pixmap::new(layout::WIDTH, layout::HEIGHT).expect("non-zero frame size")),
             last_pos: Vec::new(),
             heat: heat.then(|| Heat::new(scenario)),
+            meltdown: Meltdown::new(),
             glow,
             clock: 0,
             clip: None,
@@ -181,6 +186,9 @@ impl Renderer {
         self.draw_text(sim, palette);
         if let Some(ending) = ending {
             self.draw_flash(ending.flash_at(now));
+            if ending.effect == Effect::Meltdown {
+                self.draw_meltdown(sim, ending, now);
+            }
         }
 
         self.frame()
@@ -458,6 +466,18 @@ impl Renderer {
             COUNTER_LABEL_PX,
             mix(palette.text, palette.background, 1.0 - COUNTER_LABEL_ALPHA),
         );
+    }
+
+    /// Breaks the finished frame down: stuttering and glitching through the
+    /// Play-out, then the broken frame from the freeze to the cut.
+    fn draw_meltdown(&mut self, sim: &Simulation, ending: &Ending, now: u64) {
+        let frame = self.pixmap.data_mut();
+        if let Some(t) = ending.play_out_at(now) {
+            let index = ((now - ending.start_substep) / SUBSTEPS_PER_FRAME) as usize;
+            self.meltdown.play_out(frame, sim.seed(), index, t);
+        } else if now >= ending.freeze_substep {
+            self.meltdown.broken(frame, sim.seed());
+        }
     }
 
     /// Washes the frame with the ending's flash (`strength` 0..=1, from

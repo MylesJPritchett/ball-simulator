@@ -94,6 +94,11 @@ pub struct Ball {
 pub struct SimState {
     pub arena: Arena,
     pub balls: Vec<Ball>,
+    /// Balls that have vanished from the Arena, as they were just before,
+    /// in the order they vanished.
+    pub vanished: Vec<Ball>,
+    /// Balls marked by [`SimState::vanish`] this substep, still in `balls`.
+    vanishing: Vec<u32>,
     next_ball_id: u32,
 }
 
@@ -102,6 +107,8 @@ impl SimState {
         SimState {
             arena,
             balls: Vec::new(),
+            vanished: Vec::new(),
+            vanishing: Vec::new(),
             next_ball_id: 0,
         }
     }
@@ -130,6 +137,26 @@ impl SimState {
             if dist > limit + 1e-9 {
                 ball.pos = ball.pos * (limit / dist);
             }
+        }
+    }
+
+    /// Marks the ball at `index` as vanished. It stays in `balls` (so ball
+    /// indices stay valid while Boundary Hits are handled) until the simulation
+    /// removes it at the end of the substep, and is recorded in `vanished` as
+    /// it is now.
+    pub fn vanish(&mut self, index: usize) {
+        let ball = &self.balls[index];
+        if !self.vanishing.contains(&ball.id) {
+            self.vanishing.push(ball.id);
+            self.vanished.push(ball.clone());
+        }
+    }
+
+    /// Removes the balls marked by [`SimState::vanish`] from the Arena.
+    pub(super) fn remove_vanished(&mut self) {
+        if !self.vanishing.is_empty() {
+            let gone = std::mem::take(&mut self.vanishing);
+            self.balls.retain(|ball| !gone.contains(&ball.id));
         }
     }
 

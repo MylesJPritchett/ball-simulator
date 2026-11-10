@@ -56,7 +56,8 @@ pub trait Rule {
 
     /// Called for each Boundary Hit after the ball has been reflected and pushed
     /// back inside. `ball` is the ball's index in `state.balls`. Rules may append
-    /// balls to `state.balls` (e.g. split); they must not remove or reorder balls.
+    /// balls to `state.balls` (e.g. split) or remove one with `state.vanish`
+    /// (e.g. shrink); they must not remove or reorder balls any other way.
     fn on_boundary_hit(
         &mut self,
         _state: &mut SimState,

@@ -109,9 +109,9 @@ fn default_max_speed() -> f64 {
 }
 
 /// Quality Gate thresholds (`[quality_gate]`, optional). Durations are Video
-/// length in seconds (the action plus the ending's hold). Each defaults to
-/// no limit; an End Condition that never fires before the time cap is always
-/// rejected.
+/// length in seconds (the action plus the Ending's Play-out and hold). Each
+/// defaults to no limit; an End Condition that never fires before the time cap
+/// is always rejected.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct QualityGateSpec {

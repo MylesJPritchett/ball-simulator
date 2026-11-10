@@ -175,11 +175,11 @@ fn shrinking_seed_1() {
     assert_seed_1(
         "shrinking",
         Snapshot {
-            boundary_hits: 84,
-            final_ball_count: 1,
-            end_condition: "min_radius_reached",
-            end_substep: 15691,
-            final_state_hash: 16786892219519152768,
+            boundary_hits: 87,
+            final_ball_count: 0,
+            end_condition: "vanished",
+            end_substep: 16129,
+            final_state_hash: 4565493003704689149,
         },
     );
 }

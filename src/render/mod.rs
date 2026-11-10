@@ -5,10 +5,10 @@
 //! anything that drives a `Simulation` frame by frame (the encoder, a preview
 //! window) gets identical frames, Ending effects included.
 //!
-//! Draw order: background, fading trails, Boundary, hit glows, balls, Hook
-//! Title, Counter, then the Ending's flash over everything. Trails and glows
-//! are clipped to the Arena (Boundary included). With Heat on, the Heat field
-//! takes the place of trails and balls.
+//! Draw order: background, fading trails, Boundary, hit glows, balls, the
+//! Play-out's effect (e.g. a pop), Hook Title, Counter, then the Ending's flash
+//! over everything. Trails and glows are clipped to the Arena (Boundary
+//! included). With Heat on, the Heat field takes the place of trails and balls.
 
 mod heat;
 pub mod layout;
@@ -22,7 +22,7 @@ use tiny_skia::{
 use crate::look::palette::{Palette, Rgb};
 use crate::look::{Counter, LookSpec};
 use crate::scenario::Scenario;
-use crate::sim::{Ball, Ending, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
+use crate::sim::{Ball, Effect, Ending, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
 use heat::Heat;
 use text::{FittedText, TextPainter};
 
@@ -30,6 +30,11 @@ const BOUNDARY_WIDTH: f32 = 6.0;
 /// Ending flash colour and its opacity at full strength.
 const FLASH: [u8; 3] = [255, 255, 255];
 const FLASH_MAX_ALPHA: f32 = 0.75;
+
+/// How far (px) a pop's ring expands beyond the vanished ball's edge.
+const POP_GROWTH: f32 = 160.0;
+/// The pop ring's stroke width (px) as it starts; it thins as it fades.
+const POP_WIDTH: f32 = 12.0;
 
 /// Fraction of trail brightness kept from one frame to the next (of 256):
 /// 215/256 per frame fades to ~5% in about 17 frames (~0.3 s).
@@ -168,6 +173,10 @@ impl Renderer {
         }
         if self.heat.is_none() {
             self.draw_balls(sim, palette);
+        }
+        let play_out = ending.and_then(|e| Some((e.effect, e.play_out_at(now)?)));
+        if let Some((Effect::Pop, t)) = play_out {
+            self.draw_pops(sim, palette, t);
         }
         self.draw_text(sim, palette);
         if let Some(ending) = ending {
@@ -321,8 +330,10 @@ impl Renderer {
         for (hit, x, y) in glows {
             let t = (now - hit.substep) as f32 / GLOW_SUBSTEPS as f32;
             let strength = (1.0 - t) * (1.0 - t);
-            // Balls are only ever appended, so a ball's id is its index. Heat
-            // draws no per-ball colour, so its glows take the Boundary's.
+            // Balls are appended, so a ball's id is its index until one
+            // vanishes; a glow whose ball is not found there takes the
+            // Boundary's colour. Heat draws no per-ball colour, so its glows
+            // take the Boundary's too.
             let colour = balls
                 .get(hit.ball_id as usize)
                 .filter(|_| self.heat.is_none())
@@ -380,6 +391,31 @@ impl Renderer {
                     Transform::identity(),
                     None,
                 );
+            }
+        }
+    }
+
+    /// A ring where each vanished ball was, in its colour, expanding from its
+    /// edge and fading out as the Play-out runs (`t` 0..1).
+    fn draw_pops(&mut self, sim: &Simulation, palette: &Palette, t: f32) {
+        let ease = 1.0 - (1.0 - t) * (1.0 - t);
+        let alpha = ((1.0 - t) * 255.0).round() as u8;
+        let mut paint = Paint {
+            anti_alias: true,
+            ..Paint::default()
+        };
+        let stroke = Stroke {
+            width: POP_WIDTH * (1.0 - t) + 1.0,
+            ..Stroke::default()
+        };
+        for ball in &sim.state().vanished {
+            let (x, y) = self.to_screen(ball.pos.x, ball.pos.y);
+            let radius = ball.radius as f32 * self.scale + POP_GROWTH * ease;
+            let colour = mix(palette.ball(ball_slot(ball)), [255, 255, 255], 0.35);
+            paint.set_color(rgba(colour, alpha));
+            if let Some(circle) = PathBuilder::from_circle(x, y, radius) {
+                self.pixmap
+                    .stroke_path(&circle, &paint, &stroke, Transform::identity(), None);
             }
         }
     }

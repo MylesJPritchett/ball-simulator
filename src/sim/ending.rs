@@ -1,9 +1,13 @@
 //! The ending: what happens after an End Condition fires.
 //!
-//! The action freezes on the state at the End Condition's substep, a flash plays
-//! and fades, and the frozen frame holds for [`HOLD_SECONDS`] before the Video
-//! cuts. Everything downstream reads the timing from here (via
-//! `SimRecord::ending`) so render, audio (final chord) and the Quality Gate agree.
+//! The End Condition chooses its Ending's shape ([`EndingStyle`]): an optional
+//! Play-out in which the simulation keeps going and the Terminal State finishes
+//! on screen, whether a flash plays and the final chord sounds, and which
+//! effect the renderer draws over the Play-out. After the Play-out the action
+//! freezes and the frozen frame holds for [`HOLD_SECONDS`] before the Video
+//! cuts. Everything downstream reads the timing from [`Ending`] (via
+//! `SimRecord::ending`, built only by `Simulation::ending`) so render, audio
+//! (final chord) and the Quality Gate agree.
 
 use serde::Serialize;
 
@@ -15,24 +19,98 @@ pub const HOLD_SECONDS: f64 = 1.5;
 /// How long the flash takes to fade from full to nothing.
 pub const FLASH_SECONDS: f64 = 0.4;
 
+fn to_substeps(seconds: f64) -> u64 {
+    (seconds * SUBSTEP_HZ as f64).round() as u64
+}
+
+/// The shape of an End Condition's Ending (see `EndCondition::ending`). The
+/// default is no Play-out, with a flash and the final chord.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EndingStyle {
+    pub play_out: PlayOut,
+    /// Whether the flash plays when the End Condition fires.
+    pub flash: bool,
+    /// Whether the final chord sounds when the End Condition fires.
+    pub final_chord: bool,
+    /// What the renderer draws over the Play-out.
+    pub effect: Effect,
+}
+
+impl Default for EndingStyle {
+    fn default() -> Self {
+        EndingStyle {
+            play_out: PlayOut::None,
+            flash: true,
+            final_chord: true,
+            effect: Effect::None,
+        }
+    }
+}
+
+/// How long the simulation keeps going after the End Condition fires.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PlayOut {
+    /// The action freezes on the substep the End Condition fired.
+    None,
+    /// The action freezes `seconds` after the End Condition fired.
+    For { seconds: f64 },
+    /// The action freezes once `EndCondition::play_out_done` is true (checked
+    /// every substep from the one the End Condition fired on), or
+    /// `max_seconds` after it fired, whichever comes first.
+    Until { max_seconds: f64 },
+}
+
+impl PlayOut {
+    /// The longest the Play-out can last, in substeps.
+    pub fn max_substeps(&self) -> u64 {
+        match *self {
+            PlayOut::None => 0,
+            PlayOut::For { seconds } => to_substeps(seconds),
+            PlayOut::Until { max_seconds } => to_substeps(max_seconds),
+        }
+    }
+}
+
+/// What the renderer draws over the Play-out, timed by [`Ending::play_out_at`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Effect {
+    None,
+    /// An expanding, fading ring where each vanished ball was.
+    Pop,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct Ending {
-    /// Substep the End Condition fired; the action freezes here and the flash
-    /// (and later the final chord) starts.
+    /// Substep the End Condition fired; the Play-out, the flash and the final
+    /// chord start here.
     pub start_substep: u64,
-    /// Substeps the flash takes to fade out.
+    /// Substep the action freezes (the end of the Play-out; `start_substep`
+    /// without one).
+    pub freeze_substep: u64,
+    /// Substeps the flash takes to fade out (0: no flash).
     pub flash_substeps: u64,
     /// Substep the Video cuts (end of the hold).
     pub cut_substep: u64,
+    /// Whether the final chord sounds at `start_substep`.
+    pub final_chord: bool,
+    /// What the renderer draws over the Play-out.
+    pub effect: Effect,
 }
 
 impl Ending {
-    pub fn new(start_substep: u64) -> Self {
-        let to_substeps = |s: f64| (s * SUBSTEP_HZ as f64).round() as u64;
+    pub fn new(start_substep: u64, freeze_substep: u64, style: &EndingStyle) -> Self {
         Ending {
             start_substep,
-            flash_substeps: to_substeps(FLASH_SECONDS),
-            cut_substep: start_substep + to_substeps(HOLD_SECONDS),
+            freeze_substep,
+            flash_substeps: if style.flash {
+                to_substeps(FLASH_SECONDS)
+            } else {
+                0
+            },
+            cut_substep: freeze_substep + to_substeps(HOLD_SECONDS),
+            final_chord: style.final_chord,
+            effect: style.effect,
         }
     }
 
@@ -44,8 +122,9 @@ impl Ending {
         substep_to_seconds(self.cut_substep)
     }
 
-    /// Video frames, including the hold. Frame k shows the moment after
-    /// `k * SUBSTEPS_PER_FRAME` substeps (frozen once past `start_substep`).
+    /// Video frames, including the Play-out and the hold. Frame k shows the
+    /// moment after `k * SUBSTEPS_PER_FRAME` substeps (frozen once past
+    /// `freeze_substep`).
     pub fn frames(&self) -> u64 {
         self.cut_substep.div_ceil(SUBSTEPS_PER_FRAME)
     }
@@ -63,5 +142,16 @@ impl Ending {
         }
         let since = (substep - self.start_substep) as f32;
         (1.0 - since / self.flash_substeps as f32).max(0.0)
+    }
+
+    /// How far through the Play-out a moment is (0 when the End Condition
+    /// fires, approaching 1 at the freeze), or `None` outside the Play-out.
+    pub fn play_out_at(&self, substep: u64) -> Option<f32> {
+        (self.start_substep..self.freeze_substep)
+            .contains(&substep)
+            .then(|| {
+                (substep - self.start_substep) as f32
+                    / (self.freeze_substep - self.start_substep) as f32
+            })
     }
 }

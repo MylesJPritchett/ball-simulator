@@ -98,8 +98,9 @@ impl Preview {
         self.error.as_deref()
     }
 
-    /// Advances one frame. After the End Condition fires the last frame is held
-    /// for [`Preview::HOLD_FRAMES`], then the run restarts. Frozen while the
+    /// Advances one frame. Once the action freezes (after the End Condition
+    /// fires and its Play-out is over) the last frame is held for
+    /// [`Preview::HOLD_FRAMES`], then the run restarts. Frozen while the
     /// Scenario file is invalid.
     pub fn advance_frame(&mut self) {
         if self.error.is_some() {
@@ -108,7 +109,7 @@ impl Preview {
         let Some(running) = &mut self.running else {
             return;
         };
-        if running.sim.is_ended() {
+        if running.sim.is_frozen() {
             running.held += 1;
             if running.held > Self::HOLD_FRAMES {
                 *running = Running::start(running.scenario.clone(), self.seed);

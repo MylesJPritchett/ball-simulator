@@ -12,7 +12,7 @@
 
 use tiny_skia::Pixmap;
 
-use super::layout;
+use super::{layout, mix};
 use crate::look::palette::{Palette, Rgb, HEAT_STOPS};
 use crate::scenario::Scenario;
 
@@ -99,7 +99,7 @@ impl Heat {
                     continue;
                 }
                 let colour = if d < 1.0 {
-                    lerp(palette.background, palette.heat[0], d)
+                    mix(palette.background, palette.heat[0], d)
                 } else if self.ln_white_hot <= 0.0 {
                     palette.heat[HEAT_STOPS - 1]
                 } else {
@@ -117,10 +117,5 @@ impl Heat {
 fn ramp(stops: &[Rgb; HEAT_STOPS], t: f32) -> Rgb {
     let at = t.clamp(0.0, 1.0) * (HEAT_STOPS - 1) as f32;
     let i = (at as usize).min(HEAT_STOPS - 2);
-    lerp(stops[i], stops[i + 1], at - i as f32)
-}
-
-fn lerp(from: Rgb, to: Rgb, t: f32) -> Rgb {
-    let m = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t).round() as u8;
-    [m(from[0], to[0]), m(from[1], to[1]), m(from[2], to[2])]
+    mix(stops[i], stops[i + 1], at - i as f32)
 }

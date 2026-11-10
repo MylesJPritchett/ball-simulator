@@ -88,11 +88,20 @@ fn push_arc(
     place: impl Fn((f32, f32)) -> (f32, f32),
 ) {
     let steps = ((end - start) / BOUNDARY_ARC_STEP).ceil().max(1.0) as usize;
-    for i in 0..=steps {
-        let angle = start + (end - start) * i as f64 / steps as f64;
-        let (sin, cos) = (angle as f32).sin_cos();
-        let (x, y) = place((centre.0 + cos * r, centre.1 + sin * r));
-        if i == 0 {
+    push_polyline(
+        pb,
+        (0..=steps).map(|i| {
+            let angle = start + (end - start) * i as f64 / steps as f64;
+            let (sin, cos) = (angle as f32).sin_cos();
+            place((centre.0 + cos * r, centre.1 + sin * r))
+        }),
+    );
+}
+
+/// Adds a polyline through `points` to `pb` as a new subpath.
+fn push_polyline(pb: &mut PathBuilder, points: impl IntoIterator<Item = (f32, f32)>) {
+    for (k, (x, y)) in points.into_iter().enumerate() {
+        if k == 0 {
             pb.move_to(x, y);
         } else {
             pb.line_to(x, y);
@@ -378,14 +387,7 @@ impl Renderer {
                 .enumerate()
             {
                 let pb = if i == 0 { &mut trunks } else { &mut branches };
-                for (k, &point) in line.iter().enumerate() {
-                    let (x, y) = place(point);
-                    if k == 0 {
-                        pb.move_to(x, y);
-                    } else {
-                        pb.line_to(x, y);
-                    }
-                }
+                push_polyline(pb, line.iter().map(|&point| place(point)));
             }
         }
         for (pb, width) in [

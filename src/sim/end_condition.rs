@@ -8,6 +8,7 @@
 //! [`EndCondition::ending`] to give its Ending a Play-out, or to drop the
 //! flash or the final chord.
 
+use crate::rules::Rule;
 use crate::scenario::{RuleSpec, Scenario};
 use crate::sim::ending::{Accent, EndingStyle, Finale, PlayOut};
 use crate::sim::SimState;
@@ -72,24 +73,22 @@ pub fn build(scenario: &Scenario) -> Result<Box<dyn EndCondition>, String> {
         }
         ESCAPED => {
             no_params(spec)?;
-            let rules = crate::rules::build_all(scenario)?;
-            if !rules.iter().any(|rule| rule.lets_balls_out()) {
-                return Err(format!(
-                    "End Condition '{ESCAPED}' needs a Rule that can let a ball out (e.g. '{}')",
-                    crate::rules::GAP
-                ));
-            }
+            needs_rule(
+                scenario,
+                |rule| rule.lets_balls_out(),
+                "can let a ball out",
+                crate::rules::GAP,
+            )?;
             Ok(Box::new(Escaped::new(scenario.arena.radius)))
         }
         MELTDOWN => {
             no_params(spec)?;
-            let rules = crate::rules::build_all(scenario)?;
-            if !rules.iter().any(|rule| rule.adds_balls()) {
-                return Err(format!(
-                    "End Condition '{MELTDOWN}' needs a Rule that adds balls (e.g. '{}')",
-                    crate::rules::SPLIT
-                ));
-            }
+            needs_rule(
+                scenario,
+                |rule| rule.adds_balls(),
+                "adds balls",
+                crate::rules::SPLIT,
+            )?;
             Ok(Box::new(Meltdown {
                 cap: scenario.population_cap,
             }))
@@ -103,6 +102,26 @@ pub fn build(scenario: &Scenario) -> Result<Box<dyn EndCondition>, String> {
             }
             Err(format!("unknown End Condition '{kind}'"))
         }
+    }
+}
+
+/// Refuses the Scenario's End Condition unless one of its Rules passes
+/// `can`, which `does` describes (e.g. "adds balls"), naming `example` as a
+/// Rule that would.
+fn needs_rule(
+    scenario: &Scenario,
+    can: impl Fn(&dyn Rule) -> bool,
+    does: &str,
+    example: &str,
+) -> Result<(), String> {
+    let rules = crate::rules::build_all(scenario)?;
+    if rules.iter().any(|rule| can(rule.as_ref())) {
+        Ok(())
+    } else {
+        Err(format!(
+            "End Condition '{}' needs a Rule that {does} (e.g. '{example}')",
+            scenario.end_condition.kind
+        ))
     }
 }
 

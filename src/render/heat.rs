@@ -12,7 +12,8 @@
 
 use tiny_skia::Pixmap;
 
-use super::{layout, mix};
+use super::mix;
+use crate::layout;
 use crate::look::palette::{Palette, Rgb, HEAT_STOPS};
 use crate::scenario::Scenario;
 

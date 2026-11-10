@@ -1,4 +1,6 @@
-//! Fixed safe-zone layout for 1080x1920 vertical Video.
+//! Video frame geometry: the fixed safe-zone layout for 1080x1920 vertical
+//! Video. The renderer draws to it, and the simulation reads it to know when
+//! an escaping ball has left the frame.
 //!
 //! Top ~15%: Hook Title. Bottom ~20% and the right edge: platform UI, kept clear.
 //! The Arena is centred in the band between them; the Counter sits below it.

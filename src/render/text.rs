@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use fontdue::{Font, FontSettings, Metrics};
 use tiny_skia::Pixmap;
 
-use super::layout::Region;
+use crate::layout::Region;
 use crate::look::palette::Rgb;
 
 const INTER_BOLD: &[u8] = include_bytes!("../../assets/fonts/Inter-Bold.ttf");

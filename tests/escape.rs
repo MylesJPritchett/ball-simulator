@@ -5,7 +5,7 @@ mod support;
 
 use std::f64::consts::{PI, TAU};
 
-use ball_simulator::render::layout;
+use ball_simulator::layout;
 use ball_simulator::sim::end_condition::ESCAPE_PLAY_OUT_MAX_SECONDS;
 use ball_simulator::sim::{Ball, Simulation, SUBSTEP_HZ};
 use support::{run, scenario, MINIMAL};

@@ -4,8 +4,9 @@ mod support;
 
 use std::path::PathBuf;
 
+use ball_simulator::layout;
 use ball_simulator::preview::{Preview, Reload};
-use ball_simulator::render::{layout, Renderer};
+use ball_simulator::render::Renderer;
 use ball_simulator::sim::Simulation;
 
 /// `support::MINIMAL` plus an End Condition: a complete Scenario file.

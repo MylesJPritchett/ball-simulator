@@ -5,7 +5,8 @@ mod support;
 
 use std::f64::consts::PI;
 
-use ball_simulator::render::{layout, Renderer};
+use ball_simulator::layout;
+use ball_simulator::render::Renderer;
 use ball_simulator::sim::{self, Ending, Finale, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
 use support::{scenario, MINIMAL};
 

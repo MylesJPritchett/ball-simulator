@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 
 use crate::audio;
 use crate::encode::{EncodeError, VideoEncoder};
+use crate::layout;
 use crate::meta::VideoMeta;
-use crate::render::{layout, Renderer};
+use crate::render::Renderer;
 use crate::scenario::Scenario;
 use crate::sim::{self, Rejection, SimRecord, Simulation, FPS};
 

@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use minifb::{Key, Window, WindowOptions};
 
 use super::{downscale_to_rgb32, Preview, Reload};
-use crate::render::layout;
+use crate::layout;
 use crate::sim::FPS;
 
 /// Window pixels are this many times smaller than Video pixels (360x640).

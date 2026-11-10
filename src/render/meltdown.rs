@@ -9,7 +9,7 @@
 
 use crate::sim::rng::Rng;
 
-use super::layout;
+use crate::layout;
 
 /// XORed into the Seed for the Meltdown's RNG stream, so it draws nothing
 /// from the simulation's.

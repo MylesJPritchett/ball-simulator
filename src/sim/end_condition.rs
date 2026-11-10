@@ -286,13 +286,10 @@ impl Escaped {
     /// `arena_radius` is the Arena's starting radius, which the renderer
     /// scales to the laid-out Arena.
     fn new(arena_radius: f64) -> Self {
-        let arena = crate::render::layout::arena();
+        let arena = crate::layout::arena();
         let scale = arena_radius / arena.radius as f64;
         let (cx, cy) = (arena.center_x as f64, arena.center_y as f64);
-        let (width, height) = (
-            crate::render::layout::WIDTH as f64,
-            crate::render::layout::HEIGHT as f64,
-        );
+        let (width, height) = (crate::layout::WIDTH as f64, crate::layout::HEIGHT as f64);
         Escaped {
             frame: (
                 -cx * scale,

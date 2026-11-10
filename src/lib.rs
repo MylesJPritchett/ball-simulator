@@ -8,6 +8,7 @@
 pub mod audio;
 pub mod batch;
 pub mod encode;
+pub mod layout;
 pub mod look;
 pub mod meta;
 pub mod pipeline;

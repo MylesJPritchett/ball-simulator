@@ -12,7 +12,6 @@
 //! With Heat on, the Heat field takes the place of trails and balls.
 
 mod heat;
-pub mod layout;
 mod meltdown;
 mod shatter;
 pub mod text;
@@ -22,6 +21,7 @@ use tiny_skia::{
     PixmapPaint, Point, RadialGradient, Rect, Shader, SpreadMode, Stroke, Transform,
 };
 
+use crate::layout;
 use crate::look::palette::{Palette, Rgb};
 use crate::look::{Counter, LookSpec};
 use crate::scenario::Scenario;

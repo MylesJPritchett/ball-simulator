@@ -48,6 +48,48 @@ hashtags = ["bounce{population_cap}", "satisfying"]
 }
 
 #[test]
+fn boundary_hits_during_the_play_out_count_since_they_are_on_screen() {
+    // Splits on every Boundary Hit and melts down at 50 balls; the Meltdown's
+    // Play-out keeps the swarm bouncing for a while before the freeze. Hits up
+    // to and including the freeze substep are in the frozen frame.
+    let toml = MINIMAL.replace("time_cap = 5.0", "time_cap = 5.0\npopulation_cap = 50")
+        + "\n[[rules]]\nkind = \"split\"\ninto = 2\nspread = 40.0\n\n\
+           [end_condition]\nkind = \"meltdown\"\n\n\
+           [meta]\ndescription = \"{boundary_hits} Boundary Hits\"\n";
+    let scenario = support::scenario(&toml);
+    let record = sim::run(&scenario, 1);
+    let ending = record.ending;
+    let in_play_out = record
+        .boundary_hits
+        .iter()
+        .filter(|h| (ending.start_substep..=ending.freeze_substep).contains(&h.substep))
+        .count();
+    assert!(
+        in_play_out > 0,
+        "the swarm hits the Boundary in the Play-out"
+    );
+    assert!(
+        record
+            .boundary_hits
+            .iter()
+            .all(|h| h.substep <= ending.freeze_substep),
+        "nothing hits after the freeze"
+    );
+
+    let meta = VideoMeta::new(&scenario, &record);
+
+    let before = record
+        .boundary_hits
+        .iter()
+        .filter(|h| h.substep < ending.start_substep)
+        .count();
+    assert_eq!(
+        meta.description,
+        format!("{} Boundary Hits", before + in_play_out)
+    );
+}
+
+#[test]
 fn without_templates_the_title_is_the_hook_title_and_tags_are_the_shared_pool() {
     let scenario = support::scenario(MINIMAL);
     let meta = VideoMeta::new(&scenario, &sim::run(&scenario, 1));

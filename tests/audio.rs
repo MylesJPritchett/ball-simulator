@@ -295,6 +295,28 @@ fn sample_of(substep: u64) -> usize {
 }
 
 #[test]
+fn boundary_hits_during_the_play_out_play_their_notes() {
+    use ball_simulator::audio::voices;
+    let record = run(&melting("\n[[rules]]\nkind = \"play_note\"\n"), 1);
+    let ending = record.ending;
+    let starts: Vec<usize> = voices(&record).iter().map(|v| v.start).collect();
+    let in_play_out: Vec<_> = record
+        .boundary_hits
+        .iter()
+        .filter(|h| (ending.start_substep..=ending.freeze_substep).contains(&h.substep))
+        .collect();
+
+    assert!(!in_play_out.is_empty());
+    for hit in in_play_out {
+        assert!(
+            starts.contains(&sample_of(hit.substep)),
+            "a note at substep {}",
+            hit.substep
+        );
+    }
+}
+
+#[test]
 fn the_meltdown_has_no_final_chord() {
     use ball_simulator::audio::voices;
     // No Rule plays a note, so any Voice would be the chord.

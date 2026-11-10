@@ -20,7 +20,9 @@ pub struct SimRecord {
     pub sound: crate::audio::music::Sound,
     /// Name of the Video's palette (pinned by the Scenario or chosen by the Seed).
     pub palette: String,
-    /// Every Boundary Hit, in the order they happened.
+    /// Every Boundary Hit, in the order they happened. The Play-out is on
+    /// screen, so hits during it are here too (and play their notes), up to
+    /// and including the freeze substep.
     pub boundary_hits: Vec<BoundaryHit>,
     /// Ball count over time: one sample at substep 0 and one whenever it changes.
     pub ball_count: Vec<BallCountSample>,

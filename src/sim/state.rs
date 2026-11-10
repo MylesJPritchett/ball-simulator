@@ -226,13 +226,25 @@ impl SimState {
         }
     }
 
+    /// The balls still in the Arena: all but the escaping ones, which have
+    /// passed through the Boundary and which the Arena (its gravity, drag and
+    /// Boundary) no longer acts on.
+    pub fn balls_in_arena(&self) -> impl Iterator<Item = &Ball> {
+        self.balls.iter().filter(|ball| !ball.escaping)
+    }
+
+    /// As [`SimState::balls_in_arena`], mutably.
+    pub fn balls_in_arena_mut(&mut self) -> impl Iterator<Item = &mut Ball> {
+        self.balls.iter_mut().filter(|ball| !ball.escaping)
+    }
+
     /// Keeps every ball inside the Arena after Rules have changed radii: a
     /// ball is never larger than the Arena, and one poking past the Boundary
     /// is moved straight inward until it touches it. Velocity is unchanged.
     /// Escaping balls are left to carry on out.
     pub fn contain(&mut self) {
         let arena_radius = self.arena.radius;
-        for ball in self.balls.iter_mut().filter(|ball| !ball.escaping) {
+        for ball in self.balls_in_arena_mut() {
             ball.radius = ball.radius.min(arena_radius);
             let limit = arena_radius - ball.radius;
             let dist = ball.pos.length();

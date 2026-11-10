@@ -30,7 +30,7 @@ impl Rule for Gravity {
     fn on_substep(&mut self, state: &mut SimState, ctx: &mut RuleContext) {
         let dv = Vec2::new(0.0, self.strength * ctx.dt);
         // Gravity is the Arena's: an escaping ball flies straight out.
-        for ball in state.balls.iter_mut().filter(|ball| !ball.escaping) {
+        for ball in state.balls_in_arena_mut() {
             ball.vel += dv;
         }
     }

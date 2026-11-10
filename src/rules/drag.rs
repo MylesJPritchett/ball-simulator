@@ -30,7 +30,7 @@ impl Rule for Drag {
     fn on_substep(&mut self, state: &mut SimState, ctx: &mut RuleContext) {
         let factor = (-self.strength * ctx.dt).exp();
         // Like gravity, drag is the Arena's: an escaping ball keeps its speed.
-        for ball in state.balls.iter_mut().filter(|ball| !ball.escaping) {
+        for ball in state.balls_in_arena_mut() {
             ball.vel = ball.vel * factor;
         }
     }

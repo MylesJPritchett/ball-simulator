@@ -46,9 +46,7 @@ impl Rule for ShrinkingArena {
     fn on_substep(&mut self, state: &mut SimState, ctx: &mut RuleContext) {
         // The Boundary cannot close in past a ball it has squeezed.
         let largest = state
-            .balls
-            .iter()
-            .filter(|ball| !ball.escaping)
+            .balls_in_arena()
             .map(|ball| ball.radius)
             .fold(0.0, f64::max);
         let floor = self.min_radius.max(largest);

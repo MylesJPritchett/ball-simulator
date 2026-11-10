@@ -172,7 +172,10 @@ fn invalid_split_and_population_cap_values_are_rejected_clearly() {
     let err = error_for(&(split(2, 30.0) + "speed_jitter = 1.0\n"));
     assert!(err.contains("speed_jitter must be less than 1"), "{err}");
     let err = error_for(&(split(2, 30.0) + "angle_jitter = -2.0\n"));
-    assert!(err.contains("angle_jitter must be a finite number >= 0"), "{err}");
+    assert!(
+        err.contains("angle_jitter must be a finite number >= 0"),
+        "{err}"
+    );
     let err = error_for(&with_cap(MINIMAL, 0));
     assert!(err.contains("population_cap must be at least 1"), "{err}");
 }

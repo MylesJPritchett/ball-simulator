@@ -5,14 +5,19 @@ mod support;
 use ball_simulator::sim::{Rejection, Verdict};
 use support::MINIMAL;
 
-/// Splits into 2 on the first Boundary Hit and stops at a Population Cap of 2,
-/// so the action ends well under a second in.
+/// Splits into 2 on the first Boundary Hit and melts down at a Population
+/// Cap of 2, so the Video (with its Play-out and hold) is about 3.5 s long.
 fn ends_on_first_hit(gate: &str) -> String {
     let toml = MINIMAL.replace("time_cap = 5.0", "time_cap = 20.0\npopulation_cap = 2");
     format!(
         "{toml}\n[[rules]]\nkind = \"split\"\ninto = 2\nspread = 30.0\n\
-         [end_condition]\nkind = \"population_cap\"\n{gate}"
+         [end_condition]\nkind = \"meltdown\"\n{gate}"
     )
+}
+
+/// The ball fills the Arena 5 s in.
+fn filled_after_5_seconds(gate: &str) -> String {
+    format!("{}{gate}", support::filled_after(5.0))
 }
 
 #[test]
@@ -22,7 +27,7 @@ fn a_seed_whose_end_condition_fires_too_early_is_rejected() {
         1,
     );
 
-    assert_eq!(record.end.condition, "population_cap");
+    assert_eq!(record.end.condition, "meltdown");
     assert!(matches!(
         record.quality_gate.rejection(),
         Some(Rejection::TooShort { .. })
@@ -30,35 +35,28 @@ fn a_seed_whose_end_condition_fires_too_early_is_rejected() {
 }
 
 #[test]
-fn a_seed_whose_end_condition_never_fires_before_the_time_cap_is_rejected() {
-    // The Population Cap is far out of reach without a split Rule.
-    let toml = MINIMAL.replace("time_cap = 5.0", "time_cap = 5.0\npopulation_cap = 50");
-    let record = support::run(
-        &format!("{toml}\n[end_condition]\nkind = \"population_cap\"\n"),
-        1,
-    );
+fn a_seed_that_reaches_the_time_cap_is_rejected_whatever_its_end_condition() {
+    // Nothing grows, splits or closes in, so no End Condition can fire.
+    for kind in ["arena_filled", "arena_covered"] {
+        let record = support::run(
+            &format!("{MINIMAL}\n[end_condition]\nkind = \"{kind}\"\n"),
+            1,
+        );
 
-    assert_eq!(record.end.condition, "time_cap");
-    assert_eq!(
-        record.quality_gate.rejection(),
-        Some(&Rejection::NeverEnded { time_cap: 5.0 })
-    );
-}
-
-#[test]
-fn reaching_the_time_cap_is_fine_when_the_time_cap_is_the_end_condition() {
-    let record = support::run(MINIMAL, 1);
-
-    assert_eq!(record.end.condition, "time_cap");
-    assert!(record.quality_gate.is_accepted());
+        assert_eq!(record.end.condition, "time_cap", "{kind}");
+        assert_eq!(
+            record.quality_gate.rejection(),
+            Some(&Rejection::NeverEnded { time_cap: 5.0 }),
+            "{kind}"
+        );
+    }
 }
 
 #[test]
 fn a_seed_with_too_few_boundary_hits_is_rejected() {
-    // A slow ball in 5 s hits the Boundary only a handful of times.
-    let toml = MINIMAL.replace("speed = 900.0", "speed = 100.0");
+    // The Meltdown follows the first Boundary Hit within 1.5 s.
     let record = support::run(
-        &format!("{toml}\n[quality_gate]\nmin_boundary_hits = 20\n"),
+        &ends_on_first_hit("[quality_gate]\nmin_boundary_hits = 20\n"),
         1,
     );
 
@@ -73,7 +71,7 @@ fn a_seed_with_too_few_boundary_hits_is_rejected() {
 #[test]
 fn a_seed_whose_video_runs_too_long_is_rejected() {
     let record = support::run(
-        &format!("{MINIMAL}\n[quality_gate]\nmax_duration = 6.0\n"),
+        &filled_after_5_seconds("[quality_gate]\nmax_duration = 6.0\n"),
         1,
     );
 
@@ -87,8 +85,8 @@ fn a_seed_whose_video_runs_too_long_is_rejected() {
 #[test]
 fn a_seed_meeting_every_threshold_is_accepted() {
     let record = support::run(
-        &format!(
-            "{MINIMAL}\n[quality_gate]\nmin_duration = 6.0\nmax_duration = 7.0\nmin_boundary_hits = 3\n"
+        &filled_after_5_seconds(
+            "[quality_gate]\nmin_duration = 6.0\nmax_duration = 7.0\nmin_boundary_hits = 3\n",
         ),
         1,
     );
@@ -100,7 +98,7 @@ fn a_seed_meeting_every_threshold_is_accepted() {
 fn duration_is_judged_on_video_length_including_the_hold() {
     // 5 s of action is under 6 s, but the Video (with its hold) is not.
     let record = support::run(
-        &format!("{MINIMAL}\n[quality_gate]\nmin_duration = 6.0\n"),
+        &filled_after_5_seconds("[quality_gate]\nmin_duration = 6.0\n"),
         1,
     );
 

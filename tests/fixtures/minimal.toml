@@ -1,5 +1,7 @@
 # The smallest possible Scenario: one ball bouncing in a circular Arena,
-# a note on every Boundary Hit, ending at the time cap.
+# a note on every Boundary Hit, ending at the time cap. A test fixture, not a
+# Video: the Quality Gate rejects every Seed, since its End Condition never
+# fires.
 
 name = "Minimal"
 hook_title = "One ball, one bounce at a time"
@@ -12,15 +14,9 @@ radius = 460.0
 radius = 30.0
 speed = 900.0
 
+# Nothing grows, so the ball never fills the Arena.
 [end_condition]
-kind = "time_cap"
-
-# Seeds outside these are rejected and replaced. Durations are Video length
-# in seconds (action plus the ~1.5 s ending hold).
-[quality_gate]
-min_duration = 10.0
-max_duration = 12.0
-min_boundary_hits = 8
+kind = "arena_filled"
 
 [meta]
 title = "{hook_title}"

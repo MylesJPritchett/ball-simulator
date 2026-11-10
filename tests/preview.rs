@@ -11,7 +11,7 @@ use ball_simulator::sim::Simulation;
 /// `support::MINIMAL` plus an End Condition: a complete Scenario file.
 fn minimal() -> String {
     format!(
-        "{}\n[end_condition]\nkind = \"time_cap\"\n",
+        "{}\n[end_condition]\nkind = \"arena_filled\"\n",
         support::MINIMAL
     )
 }

@@ -65,6 +65,12 @@ pub trait Rule {
         false
     }
 
+    /// Whether this Rule can add balls (e.g. by splitting one). The
+    /// `meltdown` End Condition needs at least one such Rule.
+    fn adds_balls(&self) -> bool {
+        false
+    }
+
     /// Whether this Rule works relative to the Scenario's max speed (see
     /// `RuleContext::max_speed`), so the Scenario must set `ball.max_speed`
     /// rather than take the default.

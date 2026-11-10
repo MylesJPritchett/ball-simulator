@@ -45,11 +45,10 @@ pub enum Rejection {
 /// Judges a run of `scenario` (with this Seed's ranges resolved) from its record.
 pub fn judge(scenario: &Scenario, record: &SimRecord) -> Verdict {
     let gate = &scenario.quality_gate;
-    // When the time cap is the Scenario's End Condition, reaching it is the payoff.
-    let expects_time_cap = scenario.end_condition.kind == TIME_CAP;
     let seconds = record.ending.cut_time();
     let hits = record.boundary_hits.len();
-    let rejection = if !expects_time_cap && record.end.condition == TIME_CAP {
+    // The time cap is only a safety net: a run that reaches it never ended.
+    let rejection = if record.end.condition == TIME_CAP {
         Some(Rejection::NeverEnded {
             time_cap: scenario.time_cap,
         })

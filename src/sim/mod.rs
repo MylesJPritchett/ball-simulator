@@ -50,7 +50,7 @@ pub struct Simulation {
     palette: &'static Palette,
     state: SimState,
     rules: Vec<Box<dyn Rule>>,
-    end_condition: Option<Box<dyn EndCondition>>,
+    end_condition: Box<dyn EndCondition>,
     rng: Rng,
     substep: u64,
     max_speed: f64,
@@ -291,11 +291,10 @@ impl Simulation {
     }
 
     fn check_end(&mut self) {
-        let scenario_end = self
-            .end_condition
-            .as_ref()
-            .filter(|cond| cond.is_met(&self.state, self.substep))
-            .map(|cond| (cond.id(), cond.ending()));
+        let cond = &self.end_condition;
+        let scenario_end = cond
+            .is_met(&self.state, self.substep)
+            .then(|| (cond.id(), cond.ending()));
         // The time cap gets the default Ending.
         let fired = scenario_end.or((self.substep >= self.time_cap_substeps)
             .then(|| (end_condition::TIME_CAP, EndingStyle::default())));
@@ -316,10 +315,7 @@ impl Simulation {
         let play_out = self.ending_style.play_out;
         let over = self.substep - end.substep >= play_out.max_substeps()
             || matches!(play_out, PlayOut::Until { .. })
-                && self
-                    .end_condition
-                    .as_ref()
-                    .is_some_and(|cond| cond.play_out_done(&self.state, self.substep));
+                && self.end_condition.play_out_done(&self.state, self.substep);
         if over {
             self.frozen_at = Some(self.substep);
         }

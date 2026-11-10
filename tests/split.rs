@@ -126,40 +126,11 @@ fn ball_count_never_exceeds_the_population_cap() {
     }
 }
 
-const POPULATION_CAP_END: &str = "\n[end_condition]\nkind = \"population_cap\"\n";
-
-#[test]
-fn reaching_the_population_cap_ends_the_run_on_that_substep() {
-    let toml = with_cap(&split(2, 40.0), 50) + POPULATION_CAP_END;
-    for seed in 0..10 {
-        let record = run(&toml, seed);
-        let reached = record
-            .ball_count
-            .iter()
-            .find(|s| s.count == 50)
-            .expect("cap reached");
-
-        assert_eq!(record.end.condition, "population_cap", "seed {seed}");
-        assert_eq!(record.end.substep, reached.substep, "seed {seed}");
-        assert_eq!(record.ball_count.last(), Some(reached));
-    }
-}
-
-#[test]
-fn time_cap_still_ends_a_run_whose_population_cap_is_never_reached() {
-    // No split Rule: the single ball can never reach a cap of 50.
-    let toml = with_cap(MINIMAL, 50) + POPULATION_CAP_END;
-    let record = run(&toml, 1);
-
-    assert_eq!(record.end.condition, "time_cap");
-    assert_eq!(record.end.substep, 5 * SUBSTEP_HZ);
-}
-
 #[test]
 fn invalid_split_and_population_cap_values_are_rejected_clearly() {
     // Each has a valid End Condition, so only the value under test is wrong.
     let error_for = |toml: &str| {
-        let toml = format!("{toml}\n[end_condition]\nkind = \"time_cap\"\n");
+        let toml = format!("{toml}\n[end_condition]\nkind = \"arena_filled\"\n");
         Scenario::from_toml_str("broken", &toml)
             .expect_err("Scenario should be rejected")
             .to_string()
@@ -185,13 +156,13 @@ fn population_cap_may_be_a_range_resolved_per_seed() {
     let toml = split(3, 60.0).replace(
         "time_cap = 5.0",
         "time_cap = 5.0\npopulation_cap = { min = 20, max = 80 }",
-    ) + POPULATION_CAP_END;
+    ) + "\n[end_condition]\nkind = \"meltdown\"\n";
     let mut caps = std::collections::BTreeSet::new();
     for seed in 0..10 {
         let record = run(&toml, seed);
         let cap = record.final_balls.len();
         assert!((20..=80).contains(&cap), "seed {seed}: {cap}");
-        assert_eq!(record.end.condition, "population_cap", "seed {seed}");
+        assert_eq!(record.end.condition, "meltdown", "seed {seed}");
         caps.insert(cap);
     }
     assert!(caps.len() > 1, "different Seeds resolve different caps");
@@ -199,7 +170,7 @@ fn population_cap_may_be_a_range_resolved_per_seed() {
     let toml = with_cap(MINIMAL, 1).replace(
         "population_cap = 1",
         "population_cap = { min = 0, max = 5 }",
-    ) + "\n[end_condition]\nkind = \"time_cap\"\n";
+    ) + "\n[end_condition]\nkind = \"arena_filled\"\n";
     let err = Scenario::from_toml_str("broken", &toml)
         .expect_err("a cap range reaching 0 is rejected")
         .to_string();

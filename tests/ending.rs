@@ -102,9 +102,10 @@ fn the_simulation_keeps_going_through_the_play_out_and_stops_at_the_freeze() {
 }
 
 #[test]
-fn the_flash_starts_when_the_end_condition_fires_not_at_the_freeze() {
+fn a_vanished_balls_flash_starts_when_the_end_condition_fires_not_at_the_freeze() {
     let ending = run(&vanishing(), 3).ending;
 
+    assert_eq!(ending.accent_substep, ending.start_substep);
     assert_eq!(ending.flash_at(ending.start_substep - 1), 0.0);
     assert_eq!(ending.flash_at(ending.start_substep), 1.0);
 }

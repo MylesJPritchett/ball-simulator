@@ -49,7 +49,7 @@ fn total_samples(record: &SimRecord) -> usize {
 /// Schedules every note of the soundtrack: one per distinct pitch per substep
 /// among the Boundary Hits that play a note
 /// (simultaneous hits on the same note merge into one, a little louder), then
-/// the final chord when the End Condition fires, all under [`MAX_VOICES`].
+/// the final chord at the Ending's accent, all under [`MAX_VOICES`].
 pub fn voices(record: &SimRecord) -> Vec<Voice> {
     let total = total_samples(record);
     let note_len = (synth::note_seconds(record.sound.instrument) * SAMPLE_RATE as f64) as usize;
@@ -99,8 +99,9 @@ pub fn voices(record: &SimRecord) -> Vec<Voice> {
     }
 
     let sound = &record.sound;
-    // The chord sounds when the End Condition fires, not at the freeze.
-    let chord_start = (record.ending.start_substep * SAMPLES_PER_SUBSTEP) as usize;
+    // The chord sounds at the Ending's accent: when the End Condition fires or
+    // at the freeze, as the End Condition chooses.
+    let chord_start = (record.ending.accent_substep * SAMPLES_PER_SUBSTEP) as usize;
     let chord_len = (CHORD_SECONDS * SAMPLE_RATE as f64) as usize;
     let chord: &[i32] = if record.ending.final_chord {
         sound.scale.chord()

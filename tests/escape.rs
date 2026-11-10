@@ -183,3 +183,17 @@ fn a_ball_that_never_leaves_the_frame_freezes_at_the_play_out_maximum() {
         (ESCAPE_PLAY_OUT_MAX_SECONDS * SUBSTEP_HZ as f64).round() as u64
     );
 }
+
+#[test]
+fn the_escape_flashes_and_sounds_its_final_chord_at_the_freeze_not_when_it_fires() {
+    let toml = with_gap(360.0, 0.0) + ESCAPED_END;
+    for seed in 0..5 {
+        let ending = run(&toml, seed).ending;
+
+        assert!(ending.freeze_substep > ending.start_substep, "a Play-out");
+        assert_eq!(ending.accent_substep, ending.freeze_substep, "seed {seed}");
+        assert_eq!(ending.flash_at(ending.start_substep), 0.0, "seed {seed}");
+        assert_eq!(ending.flash_at(ending.freeze_substep - 1), 0.0);
+        assert_eq!(ending.flash_at(ending.freeze_substep), 1.0);
+    }
+}

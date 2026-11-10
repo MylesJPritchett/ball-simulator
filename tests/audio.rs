@@ -256,6 +256,30 @@ fn the_final_chord_plays_when_a_ball_vanishes_not_at_the_freeze() {
     assert!(chord >= 3, "chord has {chord} notes");
 }
 
+#[test]
+fn the_final_chord_plays_when_an_escaping_ball_has_left_the_frame_not_when_it_escapes() {
+    use ball_simulator::audio::{voices, SAMPLES_PER_SUBSTEP};
+    let toml = format!(
+        "{MINIMAL}\n[[rules]]\nkind = \"gap\"\nwidth = 360.0\nrotation_speed = 0.0\n\n\
+         [end_condition]\nkind = \"escaped\"\n"
+    );
+    let record = run(&toml, 3);
+    assert_eq!(record.end.condition, "escaped");
+    let (fired, frozen) = (
+        (record.ending.start_substep * SAMPLES_PER_SUBSTEP) as usize,
+        (record.ending.freeze_substep * SAMPLES_PER_SUBSTEP) as usize,
+    );
+    assert!(frozen > fired, "a Play-out");
+
+    let voices = voices(&record);
+    let chord = voices.iter().filter(|v| v.start == frozen).count();
+    assert!(chord >= 3, "chord has {chord} notes at the freeze");
+    assert!(
+        voices.iter().all(|v| v.start < fired || v.start >= frozen),
+        "nothing sounds between the escape and the freeze"
+    );
+}
+
 /// One ball that splits in two on every Boundary Hit and melts down once
 /// there are 50, with `rules` added.
 fn melting(rules: &str) -> String {

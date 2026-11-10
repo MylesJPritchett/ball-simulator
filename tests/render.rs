@@ -351,6 +351,44 @@ fn a_vanished_ball_pops_during_the_play_out_and_the_pop_is_gone_by_the_freeze() 
 }
 
 #[test]
+fn an_escape_flashes_at_the_freeze_not_when_the_ball_escapes() {
+    let toml = MINIMAL.to_string()
+        + "\n[[rules]]\nkind = \"gap\"\nwidth = 360.0\nrotation_speed = 0.0\n\n\
+           [end_condition]\nkind = \"escaped\"\n";
+    let ending = support::run(&toml, 3).ending;
+    assert!(ending.freeze_substep > ending.start_substep, "a Play-out");
+    // The same frames with and without the flash.
+    let draw = |flash_substeps: u64| {
+        let mut out = Vec::new();
+        draw_frames_with(
+            &toml,
+            3,
+            ending.frames(),
+            |e| Ending {
+                flash_substeps,
+                ..e
+            },
+            |_, f| out.push(f.to_vec()),
+        );
+        out
+    };
+    let flashed = draw(ending.flash_substeps);
+    let plain = draw(0);
+
+    let freeze = ending.freeze_substep.div_ceil(SUBSTEPS_PER_FRAME) as usize;
+    for k in 0..freeze {
+        assert!(
+            flashed[k] == plain[k],
+            "frame {k}: no flash before the freeze"
+        );
+    }
+    assert!(
+        flashed[freeze] != plain[freeze],
+        "the flash shows at the freeze"
+    );
+}
+
+#[test]
 fn the_same_seed_gives_the_same_record_frames_and_samples_with_a_play_out() {
     let toml = vanishing();
     let video = || {

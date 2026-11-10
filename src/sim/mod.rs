@@ -12,7 +12,7 @@ pub mod record;
 pub mod rng;
 mod state;
 
-pub use ending::{Effect, Ending, EndingStyle, PlayOut};
+pub use ending::{Accent, Effect, Ending, EndingStyle, PlayOut};
 pub use quality_gate::{Rejection, Verdict};
 pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
 pub use state::{Arena, Ball, Crack, Gap, Shatter, SimState, Vec2};

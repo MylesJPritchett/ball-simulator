@@ -9,7 +9,7 @@
 //! flash or the final chord.
 
 use crate::scenario::{RuleSpec, Scenario};
-use crate::sim::ending::{Effect, EndingStyle, PlayOut};
+use crate::sim::ending::{Accent, Effect, EndingStyle, PlayOut};
 use crate::sim::SimState;
 
 /// The id a run ends with when its End Condition never fired.
@@ -224,7 +224,8 @@ fn coverage(state: &SimState, radius: f64) -> f64 {
 pub const POP_SECONDS: f64 = 0.3;
 
 /// A ball has vanished from the Arena (e.g. shrunk to nothing by the shrink
-/// Rule). It pops: a ring expands and fades where it was.
+/// Rule). It pops: a ring expands and fades where it was, under the flash and
+/// the final chord.
 struct Vanished;
 
 impl EndCondition for Vanished {
@@ -241,6 +242,7 @@ impl EndCondition for Vanished {
             play_out: PlayOut::For {
                 seconds: POP_SECONDS,
             },
+            accent: Accent::AtFire,
             effect: Effect::Pop,
             ..EndingStyle::default()
         }
@@ -253,7 +255,8 @@ pub const ESCAPE_PLAY_OUT_MAX_SECONDS: f64 = 3.0;
 
 /// A ball has escaped: it is fully outside the Arena, through a Gap or
 /// whatever else a Rule opened in the Boundary. The Play-out runs until every
-/// escaping ball has left the Video frame.
+/// escaping ball has left the Video frame; the flash and the final chord wait
+/// for the freeze, when the escape is complete on screen.
 struct Escaped {
     /// The Video frame in simulation units, as (left, top, right, bottom)
     /// around the Arena's centre.
@@ -300,6 +303,7 @@ impl EndCondition for Escaped {
             play_out: PlayOut::Until {
                 max_seconds: ESCAPE_PLAY_OUT_MAX_SECONDS,
             },
+            accent: Accent::AtFreeze,
             ..EndingStyle::default()
         }
     }
@@ -340,6 +344,7 @@ impl EndCondition for Meltdown {
             },
             flash: false,
             final_chord: false,
+            accent: Accent::AtFire,
             effect: Effect::Meltdown,
         }
     }

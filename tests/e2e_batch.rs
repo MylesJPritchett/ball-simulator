@@ -12,20 +12,24 @@ fn scratch_dir(name: &str) -> PathBuf {
     dir
 }
 
-/// Tiny Scenario: 0.2 s of action, so each Video is mostly the ending hold.
+/// Tiny Scenario: the Arena closes in on the ball, filling it 0.2 s in, so
+/// each Video is mostly the ending hold.
 fn tiny(name: &str, extra: &str) -> String {
     format!(
         r#"
 name = "{name}"
 hook_title = "{name} hook"
-time_cap = 0.2
+time_cap = 1.0
 [arena]
 radius = 460.0
 [ball]
 radius = 30.0
 speed = {{ min = 3000.0, max = 4000.0 }}
+[[rules]]
+kind = "shrinking_arena"
+rate = 2150.0
 [end_condition]
-kind = "time_cap"
+kind = "arena_filled"
 [meta]
 title = "{name} at {{ball.speed}}"
 hashtags = ["{name}"]

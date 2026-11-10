@@ -13,6 +13,9 @@ pub type Rgb = [u8; 3];
 /// Number of ball colours in every palette.
 pub const BALL_SLOTS: usize = 5;
 
+/// Number of colours in every palette's Heat ramp; the last is white.
+pub const HEAT_STOPS: usize = 4;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Palette {
     pub name: &'static str,
@@ -22,6 +25,8 @@ pub struct Palette {
     /// Hook Title and Counter text.
     pub text: Rgb,
     pub balls: [Rgb; BALL_SLOTS],
+    /// Heat ramp, evenly spaced from a lone ball (coolest) to white-hot.
+    pub heat: [Rgb; HEAT_STOPS],
 }
 
 impl Palette {
@@ -46,6 +51,12 @@ pub const PALETTES: &[Palette] = &[
             [247, 131, 172],
             [177, 151, 252],
         ],
+        heat: [
+            [190, 40, 60],
+            [255, 107, 60],
+            [255, 200, 80],
+            [255, 255, 255],
+        ],
     },
     Palette {
         name: "neon",
@@ -58,6 +69,12 @@ pub const PALETTES: &[Palette] = &[
             [254, 228, 64],
             [0, 187, 249],
             [155, 93, 229],
+        ],
+        heat: [
+            [155, 93, 229],
+            [241, 91, 181],
+            [254, 228, 64],
+            [255, 255, 255],
         ],
     },
     Palette {
@@ -72,6 +89,12 @@ pub const PALETTES: &[Palette] = &[
             [128, 255, 219],
             [184, 192, 255],
         ],
+        heat: [
+            [40, 70, 200],
+            [76, 201, 240],
+            [128, 255, 219],
+            [255, 255, 255],
+        ],
     },
     Palette {
         name: "candy",
@@ -84,6 +107,12 @@ pub const PALETTES: &[Palette] = &[
             [208, 244, 222],
             [169, 222, 249],
             [228, 193, 249],
+        ],
+        heat: [
+            [200, 90, 170],
+            [255, 153, 200],
+            [252, 246, 189],
+            [255, 255, 255],
         ],
     },
     Palette {
@@ -98,6 +127,7 @@ pub const PALETTES: &[Palette] = &[
             [255, 208, 0],
             [255, 0, 110],
         ],
+        heat: [[200, 30, 0], [255, 120, 0], [255, 200, 40], [255, 255, 255]],
     },
     Palette {
         name: "aurora",
@@ -110,6 +140,12 @@ pub const PALETTES: &[Palette] = &[
             [157, 78, 221],
             [247, 37, 133],
             [181, 255, 60],
+        ],
+        heat: [
+            [157, 78, 221],
+            [45, 226, 230],
+            [181, 255, 60],
+            [255, 255, 255],
         ],
     },
 ];

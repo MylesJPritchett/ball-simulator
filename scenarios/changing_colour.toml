@@ -1,32 +1,34 @@
-# Every bounce changes colour: one ball falls under gravity and takes the
-# next palette colour on every Boundary Hit, speeding up a touch each time
-# against a little drag.
+# Every bounce changes colour: one ball stays low under strong gravity
+# and takes the next palette colour on every Boundary Hit, while a narrow
+# Gap creeps round the Boundary from the top towards it, until the ball
+# falls out.
 
 name = "Changing colour"
-hook_title = "Every bounce changes its colour"
-time_cap = { min = 28.0, max = 38.0 }
+hook_title = "Every bounce changes its colour — until it escapes"
+# Safety net only: a Seed whose ball never escapes is rejected.
+time_cap = 60.0
 
 [arena]
 radius = 460.0
 
 [ball]
 radius = { min = 50.0, max = 65.0 }
-speed = { min = 700.0, max = 900.0 }
+speed = { min = 300.0, max = 400.0 }
 max_speed = 3500.0
 
 [[rules]]
 kind = "gravity"
-strength = { min = 700.0, max = 1100.0 }
+strength = { min = 1800.0, max = 2200.0 }
 
-# A little air resistance: speeding up on each hit wins, but only just,
-# so the bounces build slowly instead of running away.
+# Drag and speeding up on each hit balance out, so whatever its start every
+# ball soon settles into quick, low Boundary Hits near the bottom.
 [[rules]]
 kind = "drag"
-strength = { min = 0.01, max = 0.03 }
+strength = { min = 0.15, max = 0.2 }
 
 [[rules]]
 kind = "speed_up"
-percent = { min = 2.5, max = 3.5 }
+percent = { min = 3.0, max = 4.0 }
 
 [[rules]]
 kind = "change_colour"
@@ -35,8 +37,18 @@ kind = "change_colour"
 [[rules]]
 kind = "play_note"
 
+# A narrow opening that starts at the top, out of the ball's reach, and
+# turns slowly down towards where it hits the Boundary: near misses, then it is out.
+[[rules]]
+kind = "gap"
+width = 30.0
+start_angle = { min = -100.0, max = -80.0 }
+rotation_speed = { min = 4.5, max = 5.5 }
+
+# The Terminal State: the ball is out of the Arena, and the Video holds once
+# it has left the frame.
 [end_condition]
-kind = "time_cap"
+kind = "escaped"
 
 # Notes follow where it lands on the Boundary.
 [sound]
@@ -47,13 +59,13 @@ glow = true
 trails = true
 
 # Seeds outside these are rejected and replaced. Durations are Video length
-# in seconds (action plus the ~1.5 s ending hold).
+# in seconds (action, the escape leaving the frame and the ~1.5 s hold).
 [quality_gate]
 min_duration = 28.0
 max_duration = 45.0
 min_boundary_hits = 35
 
 [meta]
-title = "Every bounce changes its colour - {boundary_hits} colours later"
-description = "One ball falls and takes the next {palette} colour on every Boundary Hit, a little faster each time."
-hashtags = ["colours", "gravity", "rainbow"]
+title = "Every bounce changes its colour - until it escapes, {boundary_hits} colours later"
+description = "One ball bounces and takes the next {palette} colour on every Boundary Hit, until the Gap comes round and it falls out."
+hashtags = ["colours", "gravity", "rainbow", "escape"]

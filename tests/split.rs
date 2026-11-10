@@ -55,6 +55,41 @@ fn split_into_three_fans_symmetrically_about_the_reflected_velocity() {
 }
 
 #[test]
+fn split_jitter_varies_each_balls_speed_and_direction_within_its_bounds() {
+    // As the fan test above, but every ball out of the split gets up to ±10%
+    // speed and ±3 degrees off its slot in the fan.
+    let first_hit = run(MINIMAL, SEED).boundary_hits[0].substep;
+    let stop = first_hit as f64 / SUBSTEP_HZ as f64;
+    let reflected = run(&with_time_cap(MINIMAL, stop), SEED).final_balls[0].vel;
+    let toml = with_time_cap(&split(3, 40.0), stop) + "speed_jitter = 0.1\nangle_jitter = 3.0\n";
+
+    let record = run(&toml, SEED);
+
+    let mut angles: Vec<f64> = record
+        .final_balls
+        .iter()
+        .map(|b| {
+            let speed = b.vel.length();
+            assert!((810.0..=990.0).contains(&speed), "speed {speed}");
+            angle_between(reflected, b.vel).to_degrees()
+        })
+        .collect();
+    angles.sort_by(f64::total_cmp);
+    for (got, slot) in angles.iter().zip([-20.0, 0.0, 20.0]) {
+        assert!((got - slot).abs() <= 3.0, "angles {angles:?}");
+    }
+    let speeds: Vec<f64> = record.final_balls.iter().map(|b| b.vel.length()).collect();
+    assert!(
+        speeds.windows(2).all(|w| w[0] != w[1]),
+        "speeds differ: {speeds:?}"
+    );
+    assert!(
+        angles.iter().zip([-20.0, 0.0, 20.0]).any(|(a, s)| a != &s),
+        "directions are jittered: {angles:?}"
+    );
+}
+
+#[test]
 fn split_children_keep_the_parents_colour() {
     let first_hit = run(MINIMAL, SEED).boundary_hits[0].substep;
     let stop = first_hit as f64 / SUBSTEP_HZ as f64;
@@ -91,40 +126,11 @@ fn ball_count_never_exceeds_the_population_cap() {
     }
 }
 
-const POPULATION_CAP_END: &str = "\n[end_condition]\nkind = \"population_cap\"\n";
-
-#[test]
-fn reaching_the_population_cap_ends_the_run_on_that_substep() {
-    let toml = with_cap(&split(2, 40.0), 50) + POPULATION_CAP_END;
-    for seed in 0..10 {
-        let record = run(&toml, seed);
-        let reached = record
-            .ball_count
-            .iter()
-            .find(|s| s.count == 50)
-            .expect("cap reached");
-
-        assert_eq!(record.end.condition, "population_cap", "seed {seed}");
-        assert_eq!(record.end.substep, reached.substep, "seed {seed}");
-        assert_eq!(record.ball_count.last(), Some(reached));
-    }
-}
-
-#[test]
-fn time_cap_still_ends_a_run_whose_population_cap_is_never_reached() {
-    // No split Rule: the single ball can never reach a cap of 50.
-    let toml = with_cap(MINIMAL, 50) + POPULATION_CAP_END;
-    let record = run(&toml, 1);
-
-    assert_eq!(record.end.condition, "time_cap");
-    assert_eq!(record.end.substep, 5 * SUBSTEP_HZ);
-}
-
 #[test]
 fn invalid_split_and_population_cap_values_are_rejected_clearly() {
     // Each has a valid End Condition, so only the value under test is wrong.
     let error_for = |toml: &str| {
-        let toml = format!("{toml}\n[end_condition]\nkind = \"time_cap\"\n");
+        let toml = format!("{toml}\n[end_condition]\nkind = \"arena_filled\"\n");
         Scenario::from_toml_str("broken", &toml)
             .expect_err("Scenario should be rejected")
             .to_string()
@@ -134,6 +140,13 @@ fn invalid_split_and_population_cap_values_are_rejected_clearly() {
     assert!(err.contains("into must be at least 2"), "{err}");
     let err = error_for(&split(2, 180.0));
     assert!(err.contains("spread must be between 0 and 180"), "{err}");
+    let err = error_for(&(split(2, 30.0) + "speed_jitter = 1.0\n"));
+    assert!(err.contains("speed_jitter must be less than 1"), "{err}");
+    let err = error_for(&(split(2, 30.0) + "angle_jitter = -2.0\n"));
+    assert!(
+        err.contains("angle_jitter must be a finite number >= 0"),
+        "{err}"
+    );
     let err = error_for(&with_cap(MINIMAL, 0));
     assert!(err.contains("population_cap must be at least 1"), "{err}");
 }
@@ -143,13 +156,13 @@ fn population_cap_may_be_a_range_resolved_per_seed() {
     let toml = split(3, 60.0).replace(
         "time_cap = 5.0",
         "time_cap = 5.0\npopulation_cap = { min = 20, max = 80 }",
-    ) + POPULATION_CAP_END;
+    ) + "\n[end_condition]\nkind = \"meltdown\"\n";
     let mut caps = std::collections::BTreeSet::new();
     for seed in 0..10 {
         let record = run(&toml, seed);
         let cap = record.final_balls.len();
         assert!((20..=80).contains(&cap), "seed {seed}: {cap}");
-        assert_eq!(record.end.condition, "population_cap", "seed {seed}");
+        assert_eq!(record.end.condition, "meltdown", "seed {seed}");
         caps.insert(cap);
     }
     assert!(caps.len() > 1, "different Seeds resolve different caps");
@@ -157,7 +170,7 @@ fn population_cap_may_be_a_range_resolved_per_seed() {
     let toml = with_cap(MINIMAL, 1).replace(
         "population_cap = 1",
         "population_cap = { min = 0, max = 5 }",
-    ) + "\n[end_condition]\nkind = \"time_cap\"\n";
+    ) + "\n[end_condition]\nkind = \"arena_filled\"\n";
     let err = Scenario::from_toml_str("broken", &toml)
         .expect_err("a cap range reaching 0 is rejected")
         .to_string();

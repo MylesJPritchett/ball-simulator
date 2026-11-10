@@ -1,7 +1,7 @@
 //! The safe-zone layout keeps the Hook Title, Arena and Counter clear of
 //! platform UI (bottom ~20%, right edge).
 
-use ball_simulator::render::layout::{self, Region};
+use ball_simulator::layout::{self, Region};
 
 /// Bottom 20% of the frame: captions, usernames, music ticker.
 const BOTTOM_UI_TOP: f32 = layout::HEIGHT as f32 * 0.80;

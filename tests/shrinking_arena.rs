@@ -2,7 +2,10 @@
 
 mod support;
 
+use std::path::Path;
+
 use ball_simulator::scenario::Scenario;
+use ball_simulator::sim::{self, SUBSTEP_HZ};
 use support::{run, MINIMAL};
 
 fn shrinking(rate: f64, min_radius: f64, time_cap: f64) -> String {
@@ -32,20 +35,34 @@ fn arena_stops_shrinking_at_the_minimum_radius() {
     assert_eq!(record.final_arena_radius, 200.0);
 }
 
-#[test]
-fn arena_min_reached_ends_when_the_arena_stops_shrinking() {
-    // 460 -> 200 at 100 units/s takes 2.6 s; the time cap is 5 s.
-    let toml = shrinking(100.0, 200.0, 5.0)
-        + "\n[end_condition]\nkind = \"arena_min_reached\"\nmin_radius = 200.0\n";
-    let record = run(&toml, 1);
+/// The shrinking-Arena Rule without a minimum: the Arena closes in on the
+/// ball (radius 30) from 460 at 100 units/s, meeting it after 4.3 s.
+fn closing_in_on_the_ball(end_condition: &str) -> String {
+    MINIMAL.replace("time_cap = 5.0", "time_cap = 6.0")
+        + "\n[[rules]]\nkind = \"shrinking_arena\"\nrate = 100.0\n"
+        + &format!("\n[end_condition]\nkind = \"{end_condition}\"\n")
+}
 
-    assert_eq!(record.end.condition, "arena_min_reached");
+#[test]
+fn without_a_minimum_the_arena_closes_in_until_it_meets_the_ball() {
+    // Nothing vanishes, so the run lasts until the 6 s time cap.
+    let record = run(&closing_in_on_the_ball("vanished"), 1);
+
+    assert_eq!(record.end.condition, "time_cap");
+    assert_eq!(record.final_arena_radius, 30.0);
+    assert_eq!(record.final_balls[0].radius, 30.0);
+}
+
+#[test]
+fn arena_filled_ends_the_squeeze_the_moment_the_arena_meets_the_ball() {
+    let record = run(&closing_in_on_the_ball("arena_filled"), 1);
+
+    assert_eq!(record.end.condition, "arena_filled");
     assert!(
-        (record.end.time() - 2.6).abs() <= 1.0 / 240.0,
+        (record.end.time() - 4.3).abs() <= 1.0 / 240.0,
         "{}",
         record.end.time()
     );
-    assert_eq!(record.final_arena_radius, 200.0);
 }
 
 #[test]
@@ -95,7 +112,7 @@ fn ball_caught_by_the_closing_boundary_registers_a_boundary_hit() {
 #[test]
 fn invalid_parameters_are_rejected_with_clear_errors() {
     let error_for = |toml: &str| {
-        let toml = format!("{toml}\n[end_condition]\nkind = \"time_cap\"\n");
+        let toml = format!("{toml}\n[end_condition]\nkind = \"arena_filled\"\n");
         Scenario::from_toml_str("broken", &toml)
             .expect_err("Scenario should be rejected")
             .to_string()
@@ -113,9 +130,9 @@ fn invalid_parameters_are_rejected_with_clear_errors() {
         "{err}"
     );
 
-    let missing = format!("{MINIMAL}\n[[rules]]\nkind = \"shrinking_arena\"\nrate = 5.0\n");
+    let missing = format!("{MINIMAL}\n[[rules]]\nkind = \"shrinking_arena\"\n");
     let err = error_for(&missing);
-    assert!(err.contains("min_radius"), "{err}");
+    assert!(err.contains("missing field `rate`"), "{err}");
 }
 
 #[test]
@@ -133,5 +150,59 @@ fn closing_boundary_knocks_the_ball_away_instead_of_dragging_it() {
                 pair[1].substep
             );
         }
+    }
+}
+
+fn shipped() -> Scenario {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("scenarios/shrinking_arena.toml");
+    Scenario::from_file(&path).expect("shipped Scenario should be valid")
+}
+
+#[test]
+fn shipped_scenario_ends_with_the_boundary_squeezing_the_ball() {
+    let scenario = shipped();
+    for seed in 1..=10 {
+        let record = sim::run(&scenario, seed);
+        assert_eq!(record.end.condition, "arena_filled", "seed {seed}");
+        let ball = &record.final_balls[0];
+        assert!(
+            record.final_arena_radius - ball.radius < 1.0,
+            "seed {seed}: Arena radius {} around a ball of radius {}",
+            record.final_arena_radius,
+            ball.radius
+        );
+    }
+}
+
+#[test]
+fn shipped_scenario_never_bursts_into_skimming_the_boundary() {
+    // A ball skimming round the Boundary hits it every few substeps: hundreds
+    // of notes a second, for as long as it skims. Bouncing across the Arena,
+    // hits only pile up like that in the last half second, when the Boundary
+    // is a few units from the ball and the squeeze itself is the climax.
+    let scenario = shipped();
+    let half_second = SUBSTEP_HZ / 2;
+    for seed in 1..=10 {
+        let record = sim::run(&scenario, seed);
+        let squeeze = record.end.substep - half_second;
+        let hits: Vec<u64> = record
+            .boundary_hits
+            .iter()
+            .map(|h| h.substep)
+            .filter(|&s| s < squeeze)
+            .collect();
+        let busiest = (0..hits.len())
+            .map(|i| {
+                hits[i..]
+                    .iter()
+                    .take_while(|&&s| s < hits[i] + half_second)
+                    .count()
+            })
+            .max()
+            .unwrap_or(0);
+        assert!(
+            busiest <= 40,
+            "seed {seed}: {busiest} Boundary Hits in half a second before the squeeze"
+        );
     }
 }

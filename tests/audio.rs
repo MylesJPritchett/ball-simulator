@@ -203,11 +203,12 @@ fn pinned_instrument_scale_and_pitch_mode_are_respected() {
     }
 }
 
-/// The shipped doubling Scenario: thousands of hits from up to 2000 balls.
+/// The shipped doubling Scenario capped at 2000 balls: thousands of hits.
 fn doubling(seed: u64, instrument: &str) -> SimRecord {
     let toml = format!(
         "{}\n[sound]\ninstrument = \"{instrument}\"\n",
         include_str!("../scenarios/doubling.toml")
+            .replace("population_cap = 100000", "population_cap = 2000")
     );
     run(&toml, seed)
 }
@@ -276,6 +277,146 @@ fn a_final_chord_plays_when_the_end_condition_fires() {
 }
 
 #[test]
+fn the_final_chord_plays_when_a_ball_vanishes_not_at_the_freeze() {
+    use ball_simulator::audio::{voices, SAMPLES_PER_SUBSTEP};
+    let toml = format!(
+        "{MINIMAL}\n[[rules]]\nkind = \"shrink\"\namount = 10.0\n\n\
+         [end_condition]\nkind = \"vanished\"\n"
+    );
+    let record = run(&toml, 3);
+    assert_eq!(record.end.condition, "vanished");
+    let fired = (record.ending.start_substep * SAMPLES_PER_SUBSTEP) as usize;
+    assert!(record.ending.freeze_substep > record.ending.start_substep);
+
+    let chord = voices(&record).iter().filter(|v| v.start == fired).count();
+    assert!(chord >= 3, "chord has {chord} notes");
+}
+
+#[test]
+fn the_final_chord_plays_when_an_escaping_ball_has_left_the_frame_not_when_it_escapes() {
+    use ball_simulator::audio::{voices, SAMPLES_PER_SUBSTEP};
+    let toml = format!(
+        "{MINIMAL}\n[[rules]]\nkind = \"gap\"\nwidth = 360.0\nrotation_speed = 0.0\n\n\
+         [end_condition]\nkind = \"escaped\"\n"
+    );
+    let record = run(&toml, 3);
+    assert_eq!(record.end.condition, "escaped");
+    let (fired, frozen) = (
+        (record.ending.start_substep * SAMPLES_PER_SUBSTEP) as usize,
+        (record.ending.freeze_substep * SAMPLES_PER_SUBSTEP) as usize,
+    );
+    assert!(frozen > fired, "a Play-out");
+
+    let voices = voices(&record);
+    let chord = voices.iter().filter(|v| v.start == frozen).count();
+    assert!(chord >= 3, "chord has {chord} notes at the freeze");
+    assert!(
+        voices.iter().all(|v| v.start < fired || v.start >= frozen),
+        "nothing sounds between the escape and the freeze"
+    );
+}
+
+/// One ball that splits in two on every Boundary Hit and melts down once
+/// there are 50, with `rules` added.
+fn melting(rules: &str) -> String {
+    MINIMAL.replace("time_cap = 5.0", "time_cap = 5.0\npopulation_cap = 50")
+        + "\n[[rules]]\nkind = \"split\"\ninto = 2\nspread = 40.0\n"
+        + rules
+        + "\n[end_condition]\nkind = \"meltdown\"\n"
+}
+
+/// Sample index of a substep.
+fn sample_of(substep: u64) -> usize {
+    (substep * ball_simulator::audio::SAMPLES_PER_SUBSTEP) as usize
+}
+
+#[test]
+fn boundary_hits_during_the_play_out_play_their_notes() {
+    use ball_simulator::audio::voices;
+    let record = run(&melting("\n[[rules]]\nkind = \"play_note\"\n"), 1);
+    let ending = record.ending;
+    let starts: Vec<usize> = voices(&record).iter().map(|v| v.start).collect();
+    let in_play_out: Vec<_> = record
+        .boundary_hits
+        .iter()
+        .filter(|h| (ending.start_substep..=ending.freeze_substep).contains(&h.substep))
+        .collect();
+
+    assert!(!in_play_out.is_empty());
+    for hit in in_play_out {
+        assert!(
+            starts.contains(&sample_of(hit.substep)),
+            "a note at substep {}",
+            hit.substep
+        );
+    }
+}
+
+#[test]
+fn the_meltdown_has_no_final_chord() {
+    use ball_simulator::audio::voices;
+    // No Rule plays a note, so any Voice would be the chord.
+    let record = run(&melting(""), 3);
+    assert_eq!(record.end.condition, "meltdown");
+    assert!(voices(&record).is_empty(), "{:?}", voices(&record));
+}
+
+#[test]
+fn the_meltdown_crackles_through_its_play_out_then_cuts_to_silence() {
+    use ball_simulator::audio::synthesize;
+    let record = run(&melting(""), 3);
+    let samples = synthesize(&record);
+    let (start, freeze) = (
+        sample_of(record.ending.start_substep),
+        sample_of(record.ending.freeze_substep),
+    );
+
+    assert!(samples[..start].iter().all(|&s| s == 0.0), "silent before");
+    let crackle = &samples[start..freeze];
+    let loud = crackle.iter().filter(|s| s.abs() > 0.05).count();
+    assert!(loud > 100, "only {loud} crackling samples");
+    // Crackle all the way through, not just at the start.
+    let tail = &crackle[crackle.len() * 3 / 4..];
+    assert!(tail.iter().any(|s| s.abs() > 0.05), "crackles to the end");
+    assert!(samples[freeze..].iter().all(|&s| s == 0.0), "a hard cut");
+}
+
+/// Whether some stretch of `samples` (at least 10 ms of sound) repeats the
+/// stretch just before it, with a lag of 5-200 ms.
+fn repeats_a_stretch(samples: &[f32]) -> bool {
+    use ball_simulator::audio::SAMPLE_RATE;
+    let ms = SAMPLE_RATE as usize / 1000;
+    (5 * ms..200 * ms).any(|lag| {
+        let mut run = 0;
+        for i in lag..samples.len() {
+            if samples[i] == samples[i - lag] && samples[i] != 0.0 {
+                run += 1;
+                if run >= 10 * ms {
+                    return true;
+                }
+            } else if samples[i] != samples[i - lag] {
+                run = 0;
+            }
+        }
+        false
+    })
+}
+
+#[test]
+fn the_meltdown_stutters_the_soundtrack_during_its_play_out() {
+    use ball_simulator::audio::synthesize;
+    let record = run(&melting("[[rules]]\nkind = \"play_note\"\n"), 3);
+    let samples = synthesize(&record);
+    let (start, freeze) = (
+        sample_of(record.ending.start_substep),
+        sample_of(record.ending.freeze_substep),
+    );
+
+    assert!(!repeats_a_stretch(&samples[..start]), "no stutter before");
+    assert!(repeats_a_stretch(&samples[start..freeze]), "a stutter");
+}
+
+#[test]
 fn the_final_mix_never_clips_even_with_2000_balls() {
     use ball_simulator::audio::{synthesize, SAMPLE_RATE};
     for instrument in ["sine_bell", "pluck", "marimba"] {
@@ -300,7 +441,7 @@ fn unknown_sound_pins_are_rejected() {
         "tempo = 3",
     ] {
         let toml = format!(
-            "{}\n[end_condition]\nkind = \"time_cap\"\n",
+            "{}\n[end_condition]\nkind = \"arena_filled\"\n",
             with_sound(bad)
         );
         let err = Scenario::from_toml_str("inline", &toml)

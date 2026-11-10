@@ -4,8 +4,10 @@
 //! The soundtrack is a pure function of the record: pitches were assigned by
 //! the simulation (see [`music`]), and this module only schedules Voices,
 //! renders them with the record's instrument, adds the final chord, then
-//! applies a light reverb and a limiter.
+//! applies a light reverb and a limiter. A Meltdown crackles, stutters and
+//! cuts to silence instead of ending on the chord (see [`meltdown`]).
 
+mod meltdown;
 mod mix;
 pub mod music;
 mod synth;
@@ -13,7 +15,7 @@ mod wav;
 
 pub use wav::write_wav;
 
-use crate::sim::{SimRecord, SUBSTEP_HZ};
+use crate::sim::{Finale, SimRecord, SUBSTEP_HZ};
 
 pub const SAMPLE_RATE: u32 = 48_000;
 /// 48 kHz / 480 Hz: every substep lands exactly on a sample boundary.
@@ -47,7 +49,7 @@ fn total_samples(record: &SimRecord) -> usize {
 /// Schedules every note of the soundtrack: one per distinct pitch per substep
 /// among the Boundary Hits that play a note
 /// (simultaneous hits on the same note merge into one, a little louder), then
-/// the final chord when the End Condition fires, all under [`MAX_VOICES`].
+/// the final chord at the Ending's accent, all under [`MAX_VOICES`].
 pub fn voices(record: &SimRecord) -> Vec<Voice> {
     let total = total_samples(record);
     let note_len = (synth::note_seconds(record.sound.instrument) * SAMPLE_RATE as f64) as usize;
@@ -97,9 +99,16 @@ pub fn voices(record: &SimRecord) -> Vec<Voice> {
     }
 
     let sound = &record.sound;
-    let chord_start = (record.ending.start_substep * SAMPLES_PER_SUBSTEP) as usize;
+    // The chord sounds at the Ending's accent: when the End Condition fires or
+    // at the freeze, as the End Condition chooses.
+    let chord_start = (record.ending.accent_substep * SAMPLES_PER_SUBSTEP) as usize;
     let chord_len = (CHORD_SECONDS * SAMPLE_RATE as f64) as usize;
-    for &semis in sound.scale.chord() {
+    let chord: &[i32] = if record.ending.final_chord {
+        sound.scale.chord()
+    } else {
+        &[]
+    };
+    for &semis in chord {
         play(
             &mut out,
             chord_start,
@@ -127,5 +136,14 @@ pub fn synthesize(record: &SimRecord) -> Vec<f32> {
             &mut dry[voice.start..voice.end],
         );
     }
-    mix::limit(&mix::reverb(&dry))
+    let ending = &record.ending;
+    let meltdown = ending.finale == Finale::Meltdown;
+    if meltdown {
+        meltdown::crackle(&mut dry, ending, record.seed);
+    }
+    let mut out = mix::limit(&mix::reverb(&dry));
+    if meltdown {
+        meltdown::stutter_and_cut(&mut out, ending, record.seed);
+    }
+    out
 }

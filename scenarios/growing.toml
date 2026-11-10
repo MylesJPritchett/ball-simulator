@@ -12,7 +12,7 @@ radius = 460.0
 radius = 14.0
 speed = { min = 850.0, max = 950.0 }
 
-# Bounces come faster as the ball grows (shorter chords), so the ending
+# Boundary Hits come faster as the ball grows (shorter chords), so the ending
 # accelerates on its own.
 [[rules]]
 kind = "grow"

@@ -1,5 +1,6 @@
 //! Simulation state: the Arena and its balls.
 
+use std::f64::consts::{PI, TAU};
 use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
 use serde::Serialize;
@@ -77,6 +78,104 @@ impl Mul<f64> for Vec2 {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Arena {
     pub radius: f64,
+    /// Openings in the Boundary, added by Rules that can let a ball out (see
+    /// `Rule::lets_balls_out`). Balls pass through them instead of bouncing.
+    pub gaps: Vec<Gap>,
+    /// Cracks in the Boundary, in the order they were made (see the `crack`
+    /// Rule). Only drawn: balls bounce off a cracked Boundary as usual.
+    pub cracks: Vec<Crack>,
+    /// Set once the Boundary has shattered (see the `crack` Rule). It is then
+    /// open all round, and drawn as shards flying out from where it broke.
+    pub shatter: Option<Shatter>,
+}
+
+/// An opening in the Boundary: the arc `width` radians wide centred on
+/// `angle` (radians, `atan2(y, x)`, y down, like a Boundary Hit's angle). A
+/// width of a full turn or more opens the whole Boundary.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Gap {
+    pub angle: f64,
+    pub width: f64,
+}
+
+/// A crack in the Boundary where a Boundary Hit landed.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Crack {
+    /// Where on the Boundary (radians, like a Boundary Hit's angle).
+    pub angle: f64,
+    /// How bad it is, from 0 (a hairline) to 1 (made at max speed); the
+    /// renderer draws bigger cracks longer and more branched.
+    pub size: f64,
+}
+
+/// Where and when the Boundary shattered.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Shatter {
+    /// Where on the Boundary it broke (radians, like a Boundary Hit's angle).
+    pub angle: f64,
+    /// The substep it broke on.
+    pub substep: u64,
+}
+
+impl Arena {
+    pub fn new(radius: f64) -> Self {
+        Arena {
+            radius,
+            gaps: Vec::new(),
+            cracks: Vec::new(),
+            shatter: None,
+        }
+    }
+
+    /// Whether the Boundary is open (in a Gap) at `angle`.
+    pub fn is_open_at(&self, angle: f64) -> bool {
+        self.gaps.iter().any(|gap| {
+            // Angular distance from the Gap's centre, in [-PI, PI).
+            let off = (angle - gap.angle + PI).rem_euclid(TAU) - PI;
+            off.abs() <= gap.width / 2.0
+        })
+    }
+
+    /// The arcs of the Boundary left between its Gaps, as (start, end) angles
+    /// with start < end, in increasing angle. One whole turn without Gaps;
+    /// none if the Gaps open it all.
+    pub fn solid_arcs(&self) -> Vec<(f64, f64)> {
+        // Each Gap as a (start, end) interval with start in [0, TAU), merged
+        // where they overlap.
+        let mut open: Vec<(f64, f64)> = self
+            .gaps
+            .iter()
+            .map(|gap| {
+                let start = (gap.angle - gap.width / 2.0).rem_euclid(TAU);
+                (start, start + gap.width.min(TAU))
+            })
+            .collect();
+        open.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let mut merged: Vec<(f64, f64)> = Vec::new();
+        for (start, end) in open {
+            match merged.last_mut() {
+                Some(last) if start <= last.1 => last.1 = last.1.max(end),
+                _ => merged.push((start, end)),
+            }
+        }
+        // The last interval can run on past a full turn into the first ones.
+        while merged.len() > 1 && merged[merged.len() - 1].1 >= merged[0].0 + TAU {
+            let first = merged.remove(0);
+            let last = merged.last_mut().expect("more than one interval");
+            last.1 = last.1.max(first.1 + TAU);
+        }
+        let Some(&(first_start, _)) = merged.first() else {
+            return vec![(0.0, TAU)];
+        };
+        let mut arcs = Vec::new();
+        for (i, &(_, end)) in merged.iter().enumerate() {
+            let next = merged.get(i + 1).map_or(first_start + TAU, |gap| gap.0);
+            if next > end {
+                arcs.push((end, next));
+            }
+        }
+        arcs
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -88,12 +187,21 @@ pub struct Ball {
     pub radius: f64,
     /// Index into the Video's palette (render wraps it to the palette length).
     pub colour: u32,
+    /// Whether the ball has passed through the Boundary (through a Gap) and
+    /// is on its way out. The Boundary no longer holds it and forces no
+    /// longer act on it, so it flies straight out.
+    pub escaping: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SimState {
     pub arena: Arena,
     pub balls: Vec<Ball>,
+    /// Balls that have vanished from the Arena, as they were just before,
+    /// in the order they vanished.
+    pub vanished: Vec<Ball>,
+    /// Balls marked by [`SimState::vanish`] this substep, still in `balls`.
+    vanishing: Vec<u32>,
     next_ball_id: u32,
 }
 
@@ -102,6 +210,8 @@ impl SimState {
         SimState {
             arena,
             balls: Vec::new(),
+            vanished: Vec::new(),
+            vanishing: Vec::new(),
             next_ball_id: 0,
         }
     }
@@ -116,12 +226,25 @@ impl SimState {
         }
     }
 
+    /// The balls still in the Arena: all but the escaping ones, which have
+    /// passed through the Boundary and which the Arena (its gravity, drag and
+    /// Boundary) no longer acts on.
+    pub fn balls_in_arena(&self) -> impl Iterator<Item = &Ball> {
+        self.balls.iter().filter(|ball| !ball.escaping)
+    }
+
+    /// As [`SimState::balls_in_arena`], mutably.
+    pub fn balls_in_arena_mut(&mut self) -> impl Iterator<Item = &mut Ball> {
+        self.balls.iter_mut().filter(|ball| !ball.escaping)
+    }
+
     /// Keeps every ball inside the Arena after Rules have changed radii: a
     /// ball is never larger than the Arena, and one poking past the Boundary
     /// is moved straight inward until it touches it. Velocity is unchanged.
+    /// Escaping balls are left to carry on out.
     pub fn contain(&mut self) {
         let arena_radius = self.arena.radius;
-        for ball in &mut self.balls {
+        for ball in self.balls_in_arena_mut() {
             ball.radius = ball.radius.min(arena_radius);
             let limit = arena_radius - ball.radius;
             let dist = ball.pos.length();
@@ -130,6 +253,26 @@ impl SimState {
             if dist > limit + 1e-9 {
                 ball.pos = ball.pos * (limit / dist);
             }
+        }
+    }
+
+    /// Marks the ball at `index` as vanished. It stays in `balls` (so ball
+    /// indices stay valid while Boundary Hits are handled) until the simulation
+    /// removes it at the end of the substep, and is recorded in `vanished` as
+    /// it is now.
+    pub fn vanish(&mut self, index: usize) {
+        let ball = &self.balls[index];
+        if !self.vanishing.contains(&ball.id) {
+            self.vanishing.push(ball.id);
+            self.vanished.push(ball.clone());
+        }
+    }
+
+    /// Removes the balls marked by [`SimState::vanish`] from the Arena.
+    pub(super) fn remove_vanished(&mut self) {
+        if !self.vanishing.is_empty() {
+            let gone = std::mem::take(&mut self.vanishing);
+            self.balls.retain(|ball| !gone.contains(&ball.id));
         }
     }
 
@@ -143,6 +286,7 @@ impl SimState {
             vel,
             radius,
             colour: 0,
+            escaping: false,
         });
         self.balls.len() - 1
     }

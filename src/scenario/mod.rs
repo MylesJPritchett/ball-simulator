@@ -51,7 +51,8 @@ pub struct Scenario {
     /// Shown above the Arena and used as the Video title. Defaults to `name`.
     #[serde(default)]
     pub hook_title: String,
-    /// Hard time cap in seconds; always an End Condition.
+    /// Hard time cap in seconds: a safety net, not an End Condition. A Seed
+    /// that reaches it is rejected by the Quality Gate.
     pub time_cap: f64,
     /// Maximum ball count; the simulation never exceeds it.
     #[serde(default = "default_population_cap")]
@@ -60,7 +61,7 @@ pub struct Scenario {
     pub ball: BallSpec,
     #[serde(default)]
     pub rules: Vec<RuleSpec>,
-    /// The Scenario's End Condition (`kind = "time_cap"` for the cap alone).
+    /// The Scenario's End Condition, which must reach a Terminal State.
     pub end_condition: RuleSpec,
     /// Thresholds a Seed must meet to be rendered.
     #[serde(default)]
@@ -109,9 +110,9 @@ fn default_max_speed() -> f64 {
 }
 
 /// Quality Gate thresholds (`[quality_gate]`, optional). Durations are Video
-/// length in seconds (the action plus the ending's hold). Each defaults to
-/// no limit; an End Condition that never fires before the time cap is always
-/// rejected.
+/// length in seconds (the action plus the Ending's Play-out and hold). Each
+/// defaults to no limit; an End Condition that never fires before the time cap
+/// is always rejected.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct QualityGateSpec {
@@ -188,7 +189,8 @@ impl Scenario {
                     .to_string()
                     .contains("missing field `end_condition`")
                 {
-                    "missing [end_condition] (use kind = \"time_cap\" to end at the time cap)"
+                    "missing [end_condition] (it must reach a Terminal State, \
+                     e.g. kind = \"arena_filled\")"
                         .to_string()
                 } else {
                     with_path(&e.path().to_string(), e.inner())
@@ -272,8 +274,20 @@ impl Scenario {
             );
         }
         // Building Rules and End Conditions validates their kinds and parameters.
+        let sets_max_speed = self
+            .raw
+            .get("ball")
+            .and_then(|ball| ball.get("max_speed"))
+            .is_some();
         for (i, spec) in self.rules.iter().enumerate() {
-            crate::rules::build(spec).map_err(|m| self.invalid(format!("rules[{i}]: {m}")))?;
+            let rule =
+                crate::rules::build(spec).map_err(|m| self.invalid(format!("rules[{i}]: {m}")))?;
+            if rule.needs_max_speed() && !sets_max_speed {
+                return Err(self.invalid(format!(
+                    "rules[{i}]: Rule '{}' needs ball.max_speed",
+                    spec.kind
+                )));
+            }
         }
         crate::sim::end_condition::build(self)
             .map_err(|m| self.invalid(format!("end_condition: {m}")))?;

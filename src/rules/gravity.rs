@@ -1,4 +1,4 @@
-//! Gravity: constant downward acceleration on every ball.
+//! Gravity: constant downward acceleration on every ball in the Arena.
 
 use serde::Deserialize;
 
@@ -29,7 +29,8 @@ impl Gravity {
 impl Rule for Gravity {
     fn on_substep(&mut self, state: &mut SimState, ctx: &mut RuleContext) {
         let dv = Vec2::new(0.0, self.strength * ctx.dt);
-        for ball in &mut state.balls {
+        // Gravity is the Arena's: an escaping ball flies straight out.
+        for ball in state.balls_in_arena_mut() {
             ball.vel += dv;
         }
     }

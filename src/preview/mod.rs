@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use crate::render::Renderer;
 use crate::scenario::Scenario;
-use crate::sim::{Ending, Simulation, SUBSTEPS_PER_FRAME};
+use crate::sim::Simulation;
 
 /// Outcome of [`Preview::check_for_changes`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,7 +41,7 @@ impl Running {
         let sim = Simulation::new(&scenario, seed);
         // Built from the Seed's resolved Scenario, not the parsed file's lower bounds.
         let mut renderer = Renderer::new(sim.scenario());
-        renderer.draw(&sim);
+        renderer.draw(&sim, None);
         Running {
             scenario,
             sim,
@@ -98,8 +98,9 @@ impl Preview {
         self.error.as_deref()
     }
 
-    /// Advances one frame. After the End Condition fires the last frame is held
-    /// for [`Preview::HOLD_FRAMES`], then the run restarts. Frozen while the
+    /// Advances one frame. Once the action freezes (after the End Condition
+    /// fires and its Play-out is over) the last frame is held for
+    /// [`Preview::HOLD_FRAMES`], then the run restarts. Frozen while the
     /// Scenario file is invalid.
     pub fn advance_frame(&mut self) {
         if self.error.is_some() {
@@ -108,7 +109,7 @@ impl Preview {
         let Some(running) = &mut self.running else {
             return;
         };
-        if running.sim.is_ended() {
+        if running.sim.is_frozen() {
             running.held += 1;
             if running.held > Self::HOLD_FRAMES {
                 *running = Running::start(running.scenario.clone(), self.seed);
@@ -117,15 +118,10 @@ impl Preview {
         } else {
             running.sim.step_frame();
         }
-        // Keep drawing during the hold (the action is frozen, trails fade), as
-        // the Video pipeline does, with the ending's flash on top, timed from
-        // the frame the End Condition fired on.
-        running.renderer.draw(&running.sim);
-        if running.sim.is_ended() {
-            running
-                .renderer
-                .flash(Ending::new(0).flash_at(running.held * SUBSTEPS_PER_FRAME));
-        }
+        // Keep drawing during the hold (the action is frozen, trails fade)
+        // with the Ending once it is known, as the Video pipeline does.
+        let ending = running.sim.ending();
+        running.renderer.draw(&running.sim, ending.as_ref());
     }
 
     /// The current frame as full-resolution RGBA, exactly as the Video renderer

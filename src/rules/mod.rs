@@ -9,7 +9,9 @@
 //! the clock, a thread RNG or hash-map iteration order.
 
 mod change_colour;
+mod crack;
 mod drag;
+mod gap;
 mod gravity;
 mod grow;
 mod play_note;
@@ -34,6 +36,8 @@ pub const SPLIT: &str = "split";
 pub const GROW: &str = "grow";
 pub const SHRINK: &str = "shrink";
 pub const PLAY_NOTE: &str = "play_note";
+pub const GAP: &str = "gap";
+pub const CRACK: &str = "crack";
 
 /// Per-call context handed to Rules by the simulation.
 pub struct RuleContext<'a> {
@@ -43,20 +47,48 @@ pub struct RuleContext<'a> {
     pub substep: u64,
     /// Substep duration in seconds.
     pub dt: f64,
+    /// The Scenario's max speed (units per second).
+    pub max_speed: f64,
 }
 
 /// One Rule's hooks into the simulation. All hooks default to doing nothing.
 ///
-/// Order within a substep: `on_substep` for every Rule (in Scenario order),
+/// `on_start` runs once for every Rule (in Scenario order) before anything
+/// else. Order within a substep: `on_substep` for every Rule (in Scenario order),
 /// then integration and Boundary resolution for every ball, then
 /// `on_boundary_hit` for each Boundary Hit (in ball order, Rules in Scenario order).
 pub trait Rule {
+    /// Whether this Rule can let a ball out of the Arena, by opening the
+    /// Boundary (adding to `state.arena.gaps`) or marking a ball `escaping`.
+    /// The `escaped` End Condition needs at least one such Rule.
+    fn lets_balls_out(&self) -> bool {
+        false
+    }
+
+    /// Whether this Rule can add balls (e.g. by splitting one). The
+    /// `meltdown` End Condition needs at least one such Rule.
+    fn adds_balls(&self) -> bool {
+        false
+    }
+
+    /// Whether this Rule works relative to the Scenario's max speed (see
+    /// `RuleContext::max_speed`), so the Scenario must set `ball.max_speed`
+    /// rather than take the default.
+    fn needs_max_speed(&self) -> bool {
+        false
+    }
+
+    /// Called once when the simulation starts, after the first ball is
+    /// placed and before the first frame (e.g. to open a Gap).
+    fn on_start(&mut self, _state: &mut SimState, _ctx: &mut RuleContext) {}
+
     /// Called once per substep before balls move (forces, Arena changes, ...).
     fn on_substep(&mut self, _state: &mut SimState, _ctx: &mut RuleContext) {}
 
     /// Called for each Boundary Hit after the ball has been reflected and pushed
     /// back inside. `ball` is the ball's index in `state.balls`. Rules may append
-    /// balls to `state.balls` (e.g. split); they must not remove or reorder balls.
+    /// balls to `state.balls` (e.g. split) or remove one with `state.vanish`
+    /// (e.g. shrink); they must not remove or reorder balls any other way.
     fn on_boundary_hit(
         &mut self,
         _state: &mut SimState,
@@ -79,6 +111,8 @@ pub fn build(spec: &RuleSpec) -> Result<Box<dyn Rule>, String> {
         GROW => Ok(Box::new(grow::Grow::from_spec(spec)?)),
         SHRINK => Ok(Box::new(shrink::Shrink::from_spec(spec)?)),
         PLAY_NOTE => Ok(Box::new(play_note::PlayNote::from_spec(spec)?)),
+        GAP => Ok(Box::new(gap::Gap::from_spec(spec)?)),
+        CRACK => Ok(Box::new(crack::Crack::from_spec(spec)?)),
         other => Err(format!("unknown Rule '{other}'")),
     }
 }

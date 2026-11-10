@@ -3,9 +3,7 @@
 mod support;
 
 use ball_simulator::scenario::Scenario;
-use support::MINIMAL;
-
-const TIME_CAP_END: &str = "\n[end_condition]\nkind = \"time_cap\"\n";
+use support::{MINIMAL, NEVER_ENDS};
 
 fn error_for(toml: &str) -> String {
     Scenario::from_toml_str("broken", toml)
@@ -15,7 +13,7 @@ fn error_for(toml: &str) -> String {
 
 /// MINIMAL plus an End Condition: a complete, valid Scenario file.
 fn complete() -> String {
-    format!("{MINIMAL}{TIME_CAP_END}")
+    format!("{MINIMAL}{NEVER_ENDS}")
 }
 
 #[test]
@@ -33,6 +31,38 @@ fn unknown_end_condition_is_named_in_the_error() {
     let toml = format!("{MINIMAL}\n[end_condition]\nkind = \"forever\"\n");
     let err = error_for(&toml);
     assert!(err.contains("unknown End Condition 'forever'"), "{err}");
+}
+
+#[test]
+fn threshold_end_conditions_are_refused_as_not_terminal() {
+    for (kind, params) in [
+        ("population_cap", ""),
+        ("max_speed_reached", ""),
+        ("min_radius_reached", "min_radius = 10.0\n"),
+        ("arena_min_reached", "min_radius = 100.0\n"),
+    ] {
+        let toml = format!("{MINIMAL}\n[end_condition]\nkind = \"{kind}\"\n{params}");
+        let err = error_for(&toml);
+        assert!(
+            err.contains("broken")
+                && err.contains(&format!(
+                    "end_condition: End Condition '{kind}' is not a Terminal State"
+                )),
+            "{kind}: {err}"
+        );
+    }
+}
+
+#[test]
+fn the_time_cap_is_refused_as_an_end_condition() {
+    let toml = format!("{MINIMAL}\n[end_condition]\nkind = \"time_cap\"\n");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("broken")
+            && err.contains("end_condition: End Condition 'time_cap' is not a Terminal State")
+            && err.contains("safety net"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -113,6 +143,125 @@ fn unknown_quality_gate_threshold_is_named_in_the_error() {
     let err = error_for(&toml);
     assert!(
         err.contains("quality_gate") && err.contains("min_hits"),
+        "{err}"
+    );
+}
+
+#[test]
+fn shrink_has_no_minimum_radius() {
+    // A shrinking ball vanishes instead of stopping at a minimum.
+    let toml = format!(
+        "{}\n[[rules]]\nkind = \"shrink\"\namount = 2.0\nmin_radius = 4.0\n",
+        complete()
+    );
+    let err = error_for(&toml);
+    assert!(
+        err.contains("broken") && err.contains("shrink") && err.contains("min_radius"),
+        "{err}"
+    );
+}
+
+#[test]
+fn escaped_needs_a_rule_that_can_let_a_ball_out() {
+    let toml = format!("{MINIMAL}\n[end_condition]\nkind = \"escaped\"\n");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("broken")
+            && err.contains(
+                "end_condition: End Condition 'escaped' needs a Rule that can let a ball out"
+            ),
+        "{err}"
+    );
+}
+
+#[test]
+fn meltdown_needs_a_rule_that_adds_balls() {
+    let toml = format!("{MINIMAL}\n[end_condition]\nkind = \"meltdown\"\n");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("broken")
+            && err.contains("end_condition: End Condition 'meltdown' needs a Rule that adds balls"),
+        "{err}"
+    );
+}
+
+#[test]
+fn meltdown_with_a_split_is_valid() {
+    let toml = format!(
+        "{MINIMAL}\n[[rules]]\nkind = \"split\"\ninto = 2\nspread = 30.0\n\
+         \n[end_condition]\nkind = \"meltdown\"\n"
+    );
+    Scenario::from_toml_str("ok", &toml).expect("meltdown with a split is valid");
+}
+
+#[test]
+fn escaped_with_a_gap_is_valid() {
+    let toml = format!(
+        "{MINIMAL}\n[[rules]]\nkind = \"gap\"\nwidth = 40.0\nrotation_speed = 10.0\n\
+         \n[end_condition]\nkind = \"escaped\"\n"
+    );
+    Scenario::from_toml_str("ok", &toml).expect("escaped with a gap is valid");
+}
+
+#[test]
+fn bad_gap_parameters_are_named_in_the_error() {
+    for (params, expected) in [
+        (
+            "width = 0.0\nrotation_speed = 0.0",
+            "'gap': width must be a finite number > 0, got 0",
+        ),
+        (
+            "width = 400.0\nrotation_speed = 0.0",
+            "'gap': width must be at most 360 degrees, got 400",
+        ),
+        (
+            "width = 30.0\nrotation_speed = inf",
+            "'gap': rotation_speed must be a finite number, got inf",
+        ),
+        ("width = 30.0", "missing field `rotation_speed`"),
+        (
+            "width = 30.0\nrotation_speed = 0.0\nspin = 1.0",
+            "unknown field `spin`",
+        ),
+    ] {
+        let toml = format!("{}\n[[rules]]\nkind = \"gap\"\n{params}\n", complete());
+        let err = error_for(&toml);
+        assert!(
+            err.contains("rules[0]") && err.contains(expected),
+            "{params}: {err}"
+        );
+    }
+}
+
+/// MINIMAL with a max speed and the `crack` Rule, ending on `escaped`.
+fn cracking() -> String {
+    format!(
+        "{}\n[[rules]]\nkind = \"crack\"\n\n[end_condition]\nkind = \"escaped\"\n",
+        MINIMAL.replace("speed = 900.0", "speed = 900.0\nmax_speed = 2000.0")
+    )
+}
+
+#[test]
+fn escaped_with_a_crack_is_valid() {
+    Scenario::from_toml_str("ok", &cracking()).expect("escaped with a crack is valid");
+}
+
+#[test]
+fn crack_needs_a_max_speed() {
+    let toml = cracking().replace("max_speed = 2000.0\n", "");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("broken") && err.contains("rules[0]: Rule 'crack' needs ball.max_speed"),
+        "{err}"
+    );
+}
+
+#[test]
+fn crack_has_no_parameters() {
+    let toml = cracking().replace("kind = \"crack\"", "kind = \"crack\"\nlength = 3.0");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("rules[0]") && err.contains("unknown field `length`"),
         "{err}"
     );
 }

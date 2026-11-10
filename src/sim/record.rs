@@ -20,13 +20,16 @@ pub struct SimRecord {
     pub sound: crate::audio::music::Sound,
     /// Name of the Video's palette (pinned by the Scenario or chosen by the Seed).
     pub palette: String,
-    /// Every Boundary Hit, in the order they happened.
+    /// Every Boundary Hit, in the order they happened. The Play-out is on
+    /// screen, so hits during it are here too (and play their notes), up to
+    /// and including the freeze substep.
     pub boundary_hits: Vec<BoundaryHit>,
     /// Ball count over time: one sample at substep 0 and one whenever it changes.
     pub ball_count: Vec<BallCountSample>,
     /// Which End Condition fired and when.
     pub end: EndEvent,
-    /// Timing of the freeze, flash and hold that follow the End Condition.
+    /// Timing of the Play-out, freeze, flash and hold that follow the End
+    /// Condition.
     pub ending: Ending,
     pub stats: SimStats,
     /// The Quality Gate's verdict on this Seed.
@@ -72,7 +75,8 @@ pub struct BallCountSample {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct EndEvent {
-    /// End Condition id, e.g. `"time_cap"`.
+    /// End Condition id, e.g. `"arena_filled"`, or `"time_cap"` if the time
+    /// cap ended the run instead.
     pub condition: String,
     /// Substeps completed when it fired.
     pub substep: u64,

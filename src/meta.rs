@@ -70,8 +70,10 @@ const DEFAULT_TITLE: &str = "{hook_title}";
 /// Metadata templates (`[meta]` in a Scenario file, optional). Each may use
 /// `{placeholders}`: any value in the Scenario file by its path (`ball.speed`,
 /// `population_cap`, `rules[0].percent`, `hook_title`, ...), resolved for the
-/// Seed, plus `seed`, `palette`, `instrument`, `scale`, `boundary_hits`,
-/// `balls` (final ball count) and `duration` (Video length in whole seconds).
+/// Seed, plus `seed`, `palette`, `instrument`, `scale`, `boundary_hits`
+/// (every Boundary Hit on screen, including those during the Play-out),
+/// `balls` (final ball count) and `duration` (Video length in whole seconds,
+/// including the Play-out and the hold).
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetaSpec {

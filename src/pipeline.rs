@@ -5,10 +5,11 @@ use std::path::{Path, PathBuf};
 
 use crate::audio;
 use crate::encode::{EncodeError, VideoEncoder};
+use crate::layout;
 use crate::meta::VideoMeta;
-use crate::render::{layout, Renderer};
+use crate::render::Renderer;
 use crate::scenario::Scenario;
-use crate::sim::{self, Rejection, SimRecord, Simulation, FPS, SUBSTEPS_PER_FRAME};
+use crate::sim::{self, Rejection, SimRecord, Simulation, FPS};
 
 #[derive(Debug, thiserror::Error)]
 pub enum GenerateError {
@@ -159,7 +160,8 @@ fn render(
     let dir = video_dir(out_root, scenario, seed);
     std::fs::create_dir_all(&dir).map_err(io_err(&dir))?;
 
-    // The Video runs through the ending's hold, not just to the End Condition.
+    // The Video runs through the Ending's Play-out and hold, not just to the
+    // End Condition.
     let ending = record.ending;
     let frames = ending.frames();
 
@@ -174,12 +176,12 @@ fn render(
     // Built from the Seed's resolved Scenario (ranges such as the Arena radius
     // resolved), not the parsed file's lower bounds.
     let mut renderer = Renderer::new(sim.scenario());
-    // Frame k shows the state after k * SUBSTEPS_PER_FRAME substeps; once the
-    // run has ended `step_frame` does nothing, so the action freezes, the
-    // trails keep fading and the flash plays over the frozen frame.
-    for frame in 0..frames {
-        renderer.draw(&sim);
-        encoder.write_frame(renderer.flash(ending.flash_at(frame * SUBSTEPS_PER_FRAME)))?;
+    // Frame k shows the state after k * SUBSTEPS_PER_FRAME substeps; the run
+    // keeps going through the Play-out, then `step_frame` does nothing, so the
+    // action freezes, the trails keep fading and the renderer plays the
+    // Ending's flash and Finale over it.
+    for _ in 0..frames {
+        encoder.write_frame(renderer.draw(&sim, Some(&ending)))?;
         sim.step_frame();
     }
     encoder.finish()?;

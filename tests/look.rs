@@ -124,6 +124,42 @@ fn speed_counter_shows_the_ball_speed() {
 }
 
 #[test]
+fn rings_settled_counter_counts_the_settles_so_far_on_every_frame() {
+    // Rings (thickness 20) growing by 50 per Boundary Hit into an Arena of
+    // radius 460: 22 settle before it is solid.
+    let toml = MINIMAL
+        .replace("time_cap = 5.0", "time_cap = 300.0")
+        .replace("speed = 900.0", "speed = 900.0\nthickness = 20.0")
+        + "\n[[rules]]\nkind = \"grow\"\namount = 50.0\n\
+           \n[[rules]]\nkind = \"settle\"\n\
+           \n[end_condition]\nkind = \"solid\"\n\
+           \n[look]\ncounter = \"rings_settled\"\n";
+    let (readings, record) = read_counter_every_frame(&toml, 1);
+
+    assert_eq!(record.settles.len(), 22);
+    assert_eq!(readings.first().unwrap().0, 0);
+    assert_eq!(readings.last().unwrap().0, 22);
+    for (value, substep) in readings {
+        let expected = record
+            .settles
+            .iter()
+            .filter(|s| s.substep <= substep)
+            .count() as u64;
+        assert_eq!(value, expected, "at substep {substep}");
+    }
+}
+
+#[test]
+fn rings_settled_counter_says_ring_for_one_and_rings_otherwise() {
+    let counter = scenario(&with_look("counter = \"rings_settled\""))
+        .look
+        .counter;
+    assert_eq!(counter.label(0), "RINGS");
+    assert_eq!(counter.label(1), "RING");
+    assert_eq!(counter.label(2), "RINGS");
+}
+
+#[test]
 fn trails_and_glow_are_on_by_default_and_can_be_switched_off() {
     let default = scenario(MINIMAL).look;
     assert!(default.trails && default.glow);

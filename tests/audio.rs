@@ -450,3 +450,65 @@ fn unknown_sound_pins_are_rejected() {
         assert!(err.contains("sound"), "{bad}: {err}");
     }
 }
+
+/// Rings (thickness 20) growing by 50 per Boundary Hit and settling into an
+/// Arena of radius 460 until it is solid: 22 settles. No Rule plays a note,
+/// so every Voice is a chord.
+fn growing_rings() -> SimRecord {
+    let toml = MINIMAL
+        .replace("time_cap = 5.0", "time_cap = 300.0")
+        .replace("speed = 900.0", "speed = 900.0\nthickness = 20.0")
+        + "\n[[rules]]\nkind = \"grow\"\namount = 50.0\n\
+           \n[[rules]]\nkind = \"settle\"\n\
+           \n[end_condition]\nkind = \"solid\"\n";
+    run(&toml, 1)
+}
+
+#[test]
+fn every_settle_but_the_last_plays_a_quiet_final_chord_and_the_last_the_full_one_once() {
+    use ball_simulator::audio::voices;
+    let record = growing_rings();
+    assert_eq!(record.end.condition, "solid");
+    assert_eq!(record.settles.len(), 22);
+    let voices = voices(&record);
+    let chord_at = |substep: u64| -> Vec<(f64, f64)> {
+        let mut chord: Vec<(f64, f64)> = voices
+            .iter()
+            .filter(|v| v.start == sample_of(substep))
+            .map(|v| (v.pitch, v.gain))
+            .collect();
+        chord.sort_by(|a, b| a.0.total_cmp(&b.0));
+        chord
+    };
+
+    let (last, earlier) = record.settles.split_last().unwrap();
+    assert_eq!(last.substep, record.end.substep);
+    let full = chord_at(last.substep);
+    assert!(full.len() >= 3, "the full chord: {full:?}");
+    let full_pitches: Vec<f64> = full.iter().map(|n| n.0).collect();
+    let mut distinct = full_pitches.clone();
+    distinct.dedup();
+    assert_eq!(distinct, full_pitches, "each note once, not twice");
+
+    for settle in earlier {
+        let quiet = chord_at(settle.substep);
+        let pitches: Vec<f64> = quiet.iter().map(|n| n.0).collect();
+        assert_eq!(
+            pitches, full_pitches,
+            "the final chord at substep {}",
+            settle.substep
+        );
+        for ((_, gain), (_, full_gain)) in quiet.iter().zip(&full) {
+            let ratio = gain / full_gain;
+            assert!(
+                (0.25..=0.4).contains(&ratio),
+                "about a third of the full chord's level, got {ratio}"
+            );
+        }
+    }
+    assert_eq!(
+        voices.len(),
+        full.len() * record.settles.len(),
+        "no other chords"
+    );
+}

@@ -48,7 +48,7 @@ The short premise shown above the Arena and used as the Video's title (e.g. "Eve
 How many balls overlap at a point in the Arena, shown as colour that reaches white-hot at the Population Cap.
 
 **Counter**:
-The live number shown below the Arena (ball count, Boundary Hit count, or speed), chosen by the Scenario.
+The live number shown below the Arena (ball count, Boundary Hit count, speed, or Rings settled), chosen by the Scenario.
 
 **Quality Gate**:
 A headless dry run of a Seed that rejects it if the resulting Video would be dull (ends too soon, never ends, too few Boundary Hits).

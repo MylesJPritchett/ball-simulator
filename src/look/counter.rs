@@ -14,6 +14,8 @@ pub enum Counter {
     BallCount,
     /// Speed of the fastest ball, in simulation units per second (rounded).
     Speed,
+    /// Rings settled so far (see the `settle` Rule).
+    RingsSettled,
 }
 
 impl Counter {
@@ -29,6 +31,7 @@ impl Counter {
                 .map(|b| b.vel.length())
                 .fold(0.0, f64::max)
                 .round() as u64,
+            Counter::RingsSettled => sim.state().settles.len() as u64,
         }
     }
 
@@ -40,6 +43,8 @@ impl Counter {
             (Counter::BallCount, 1) => "BALL",
             (Counter::BallCount, _) => "BALLS",
             (Counter::Speed, _) => "SPEED",
+            (Counter::RingsSettled, 1) => "RING",
+            (Counter::RingsSettled, _) => "RINGS",
         }
     }
 }

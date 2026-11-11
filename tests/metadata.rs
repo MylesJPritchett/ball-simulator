@@ -112,6 +112,33 @@ fn a_scenario_with_an_unknown_placeholder_is_invalid() {
     assert!(err.contains("{cap_typo}"), "{err}");
 }
 
+#[test]
+fn templates_can_name_how_many_rings_settled() {
+    // Rings (thickness 20) growing by 50 per Boundary Hit into an Arena of
+    // radius 460: 22 settle before it is solid.
+    let toml = MINIMAL
+        .replace("time_cap = 5.0", "time_cap = 300.0")
+        .replace("speed = 900.0", "speed = 900.0\nthickness = 20.0")
+        + "\n[[rules]]\nkind = \"grow\"\namount = 50.0\n\
+           \n[[rules]]\nkind = \"settle\"\n\
+           \n[end_condition]\nkind = \"solid\"\n\
+           \n[meta]\ndescription = \"{rings_settled} Rings until it is solid\"\n";
+    let scenario = support::scenario(&toml);
+    let meta = VideoMeta::new(&scenario, &sim::run(&scenario, 1));
+
+    assert_eq!(meta.description, "22 Rings until it is solid");
+}
+
+#[test]
+fn without_rings_none_settled() {
+    let scenario = support::scenario(&format!(
+        "{MINIMAL}\n[meta]\ntitle = \"{{rings_settled}} settled\"\n"
+    ));
+    let meta = VideoMeta::new(&scenario, &sim::run(&scenario, 1));
+
+    assert_eq!(meta.title, "0 settled");
+}
+
 fn vars(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
     pairs
         .iter()

@@ -82,8 +82,12 @@ A ball passing out through an opening a Rule made in the Boundary (such as a Gap
 A ball with a hollow centre, given by its thickness: its hole's radius is its radius minus its thickness, and the thickness stays the same as the ball grows or shrinks. Its outer edge bounces off the Boundary; on its own the hole is only how it looks, so it moves exactly like a solid ball of the same radius.
 _Avoid_: Hoop, donut, hollow ball
 
+**Peg**:
+A fixed solid disc at the centre of the Arena that a Ring moves around: the Ring's inner edge bounces off it as its outer edge bounces off the Boundary. Only a Ring can be in an Arena with a Peg.
+_Avoid_: Post, hub, core
+
 **Boundary Hit**:
-A ball touching the Boundary; the default trigger for sounds and on-hit Rules. Balls pass through each other unless a Rule says otherwise.
+A ball touching the Boundary or a Peg; the default trigger for sounds and on-hit Rules, which treat both alike. A hit says which surface it was on and where on that surface it landed. Balls pass through each other unless a Rule says otherwise.
 _Avoid_: Collision, bounce, edge hit
 
 ### Audio

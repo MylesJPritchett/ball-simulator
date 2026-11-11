@@ -14,7 +14,7 @@ mod state;
 
 pub use ending::{Accent, Ending, EndingStyle, Finale, PlayOut};
 pub use quality_gate::{Rejection, Verdict};
-pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
+pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats, Surface};
 pub use state::{Arena, Ball, Crack, Gap, Shatter, SimState, Vec2};
 
 use crate::audio::music::Sound;
@@ -78,10 +78,13 @@ impl Simulation {
         let end_condition =
             end_condition::build(scenario).expect("Scenario End Condition was validated");
 
-        let mut state = SimState::new(Arena::new(scenario.arena.radius));
-        // The ball starts somewhere in the inner half of the Arena, already moving.
+        let mut arena = Arena::new(scenario.arena.radius);
+        arena.peg_radius = scenario.arena.peg_radius;
+        let mut state = SimState::new(arena);
+        // The ball starts somewhere in the inner half of the room it has in
+        // the Arena, already moving.
         let ball = &scenario.ball;
-        let max_start = (scenario.arena.radius - ball.radius) * 0.5;
+        let max_start = state.arena.room(ball.radius, ball.thickness) * 0.5;
         let start_angle = rng.range_f64(0.0, std::f64::consts::TAU);
         let start_dist = max_start * rng.next_f64().sqrt();
         let dir = rng.range_f64(0.0, std::f64::consts::TAU);
@@ -224,7 +227,8 @@ impl Simulation {
         let arena_radius = self.state.arena.radius;
         for (index, ball) in self.state.balls.iter_mut().enumerate() {
             ball.pos += ball.vel * dt;
-            if let Some(angle) = resolve_boundary(ball, &self.state.arena, closing_speed) {
+            if let Some((surface, angle)) = resolve_boundary(ball, &self.state.arena, closing_speed)
+            {
                 let hit_index = self.boundary_hits.len() + hits.len();
                 let pitch = self
                     .sound
@@ -234,6 +238,7 @@ impl Simulation {
                     BoundaryHit {
                         substep: completed,
                         ball_id: ball.id,
+                        surface,
                         angle,
                         pitch,
                         speed: ball.vel.length(),
@@ -280,6 +285,11 @@ impl Simulation {
             let overshoot = ball.pos.length() + ball.radius - arena.radius;
             if overshoot > self.stats.max_boundary_overshoot {
                 self.stats.max_boundary_overshoot = overshoot;
+            }
+            if let (Some(peg), Some(thickness)) = (arena.peg_radius, ball.thickness) {
+                let hole = ball.radius - thickness;
+                let overshoot = ball.pos.length() + peg - hole;
+                self.stats.max_peg_overshoot = self.stats.max_peg_overshoot.max(overshoot);
             }
         }
         let count = self.state.balls.len();
@@ -361,21 +371,38 @@ const RESTING_SPEED: f64 = 30.0;
 /// `closing_speed` while the Arena shrinks: then its velocity is reflected
 /// about the Boundary normal in the Boundary's frame. A ball resting on
 /// (outward slower than [`RESTING_SPEED`]) or already leaving the Boundary is
-/// not hitting it. Returns the hit angle on the Boundary if it hit.
+/// not hitting it. Returns the surface hit and the hit angle on it.
+///
+/// A Ring round a Peg is held by whichever comes first as its centre moves
+/// out: its outer edge meeting the Boundary, or its inner edge meeting the
+/// Peg. Both push it back towards the Arena's centre, so the Peg is resolved
+/// the same way (it never moves, so it closes on nothing); the hit lands on
+/// the Peg's far side from the Ring's centre.
 ///
 /// A ball moving outward whose contact point is in a Gap is not held: it
 /// starts escaping and is never resolved against the Boundary again.
-fn resolve_boundary(ball: &mut Ball, arena: &Arena, closing_speed: f64) -> Option<f64> {
+fn resolve_boundary(ball: &mut Ball, arena: &Arena, closing_speed: f64) -> Option<(Surface, f64)> {
     if ball.escaping {
         return None;
     }
-    let limit = arena.radius - ball.radius;
+    let boundary_limit = arena.radius - ball.radius;
+    let peg_limit = match (arena.peg_radius, ball.thickness) {
+        (Some(peg), Some(thickness)) => Some((ball.radius - thickness - peg).max(0.0)),
+        _ => None,
+    };
+    let (surface, limit, closing_speed) = match peg_limit {
+        Some(peg_limit) if peg_limit < boundary_limit => (Surface::Peg, peg_limit, 0.0),
+        _ => (Surface::Boundary, boundary_limit, closing_speed),
+    };
     let dist = ball.pos.length();
     if dist < limit || dist == 0.0 {
         return None;
     }
     let normal = ball.pos * (1.0 / dist);
-    if ball.vel.dot(normal) > 0.0 && arena.is_open_at(normal.angle()) {
+    if surface == Surface::Boundary
+        && ball.vel.dot(normal) > 0.0
+        && arena.is_open_at(normal.angle())
+    {
         ball.escaping = true;
         return None;
     }
@@ -391,7 +418,11 @@ fn resolve_boundary(ball: &mut Ball, arena: &Arena, closing_speed: f64) -> Optio
         return None;
     }
     ball.vel -= normal * (2.0 * outward);
-    Some(normal.angle())
+    let angle = match surface {
+        Surface::Boundary => normal.angle(),
+        Surface::Peg => (normal * -1.0).angle(),
+    };
+    Some((surface, angle))
 }
 
 /// FNV-1a over the bit patterns of the final state. Stable across runs and
@@ -406,6 +437,10 @@ fn hash_state(state: &SimState, substep: u64) -> u64 {
     };
     feed(substep);
     feed(state.arena.radius.to_bits());
+    // Only with a Peg, so hashes without one are unchanged.
+    if let Some(peg) = state.arena.peg_radius {
+        feed(peg.to_bits());
+    }
     feed(state.balls.len() as u64);
     for b in &state.balls {
         feed(b.id as u64);

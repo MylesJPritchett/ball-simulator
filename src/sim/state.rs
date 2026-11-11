@@ -87,6 +87,9 @@ pub struct Arena {
     /// Set once the Boundary has shattered (see the `crack` Rule). It is then
     /// open all round, and drawn as shards flying out from where it broke.
     pub shatter: Option<Shatter>,
+    /// `Some` for an Arena with a Peg this big: a fixed solid disc at its
+    /// centre that a Ring's inner edge bounces off.
+    pub peg_radius: Option<f64>,
 }
 
 /// An opening in the Boundary: the arc `width` radians wide centred on
@@ -124,6 +127,18 @@ impl Arena {
             gaps: Vec::new(),
             cracks: Vec::new(),
             shatter: None,
+            peg_radius: None,
+        }
+    }
+
+    /// How far from the Arena's centre a ball this big (and, for a Ring, this
+    /// thick) can be: until its outer edge meets the Boundary or, for a Ring
+    /// round a Peg, its inner edge meets the Peg.
+    pub fn room(&self, radius: f64, thickness: Option<f64>) -> f64 {
+        let boundary = self.radius - radius;
+        match (self.peg_radius, thickness) {
+            (Some(peg), Some(thickness)) => boundary.min((radius - thickness - peg).max(0.0)),
+            _ => boundary,
         }
     }
 
@@ -245,13 +260,14 @@ impl SimState {
 
     /// Keeps every ball inside the Arena after Rules have changed radii: a
     /// ball is never larger than the Arena, and one poking past the Boundary
-    /// is moved straight inward until it touches it. Velocity is unchanged.
+    /// (or a Ring whose inner edge overlaps the Peg) is moved straight inward
+    /// until it touches it. Velocity is unchanged.
     /// Escaping balls are left to carry on out.
     pub fn contain(&mut self) {
-        let arena_radius = self.arena.radius;
-        for ball in self.balls_in_arena_mut() {
-            ball.radius = ball.radius.min(arena_radius);
-            let limit = arena_radius - ball.radius;
+        let SimState { arena, balls, .. } = self;
+        for ball in balls.iter_mut().filter(|ball| !ball.escaping) {
+            ball.radius = ball.radius.min(arena.radius);
+            let limit = arena.room(ball.radius, ball.thickness);
             let dist = ball.pos.length();
             // The tolerance leaves balls that Boundary resolution already
             // placed on the Boundary untouched (bit for bit).

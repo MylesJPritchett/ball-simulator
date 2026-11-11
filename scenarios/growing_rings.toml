@@ -1,0 +1,63 @@
+# Every bounce it grows: one small Ring grows on each Boundary Hit until it
+# fills the Arena, then settles into the Boundary as a layer in its colour. A
+# new Ring starts at the centre, so the Arena fills in layer by layer until it
+# is a solid disc.
+
+name = "Growing Rings"
+hook_title = "Every bounce it grows"
+time_cap = 60.0
+
+[arena]
+radius = 460.0
+
+[ball]
+radius = 30.0
+# Fast, since the small grow amount (see below) takes many hits per layer.
+speed = { min = 3600.0, max = 4000.0 }
+# How thick each layer is: the Seed picks how many layers the disc has.
+thickness = { min = 14.0, max = 23.0 }
+
+# Each new Ring starts at the first palette colour, so a layer's colour is
+# set by how many hits it took to fill the Arena. Growing by less than the
+# thickness (but more than a quarter of it) means each Ring takes one to four
+# hits fewer than the last, so neighbouring layers never share a colour.
+#
+# Without gravity every Boundary Hit is radial, so a Ring crosses the centre
+# on every bounce: a cycle lasts about (gap)^2 / (amount * speed), and as the
+# Arena shrinks layer by layer each cycle is shorter than the last.
+[[rules]]
+kind = "grow"
+amount = { min = 10.0, max = 12.0 }
+
+[[rules]]
+kind = "settle"
+
+[[rules]]
+kind = "change_colour"
+
+# Every Boundary Hit plays a note.
+[[rules]]
+kind = "play_note"
+
+# The Terminal State: no Ring fits in what is left of the Arena.
+[end_condition]
+kind = "solid"
+
+# The note drops as each Ring grows, and starts high again with the next.
+[sound]
+pitch_mode = "ball_size"
+
+[look]
+counter = "rings_settled"
+
+# Seeds outside these are rejected and replaced. Durations are Video length
+# in seconds (action plus the ~1.5 s ending hold).
+[quality_gate]
+min_duration = 25.0
+max_duration = 55.0
+min_boundary_hits = 100
+
+[meta]
+title = "Every bounce it grows - {rings_settled} Rings later..."
+description = "Each Ring grows {rules[0].amount} units every bounce until it fills the Arena and settles: {rings_settled} layers and {boundary_hits} bounces in {duration} seconds."
+hashtags = ["growing", "satisfying"]

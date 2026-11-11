@@ -171,6 +171,20 @@ fn growing_seed_1() {
 }
 
 #[test]
+fn growing_rings_seed_1() {
+    assert_seed_1(
+        "growing_rings",
+        Snapshot {
+            boundary_hits: 476,
+            final_ball_count: 0,
+            end_condition: "solid",
+            end_substep: 16883,
+            final_state_hash: 9189708188696506814,
+        },
+    );
+}
+
+#[test]
 fn shrinking_seed_1() {
     assert_seed_1(
         "shrinking",

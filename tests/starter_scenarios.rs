@@ -7,6 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
+use ball_simulator::look::palette::BALL_SLOTS;
 use ball_simulator::scenario::Scenario;
 use ball_simulator::sim;
 
@@ -113,6 +114,39 @@ fn faster_every_bounce_ends_when_its_ball_breaks_out() {
     let record = sim::run(&scenario, 1);
     assert_eq!(record.end.condition, "escaped");
     assert!(record.final_balls[0].escaping);
+}
+
+#[test]
+fn growing_rings_settles_into_a_solid_disc_of_distinct_layers() {
+    let (_, scenario) = shipped()
+        .into_iter()
+        .find(|(_, s)| s.id == "growing_rings")
+        .expect("growing_rings ships");
+    assert_eq!(scenario.hook_title, "Every bounce it grows");
+    assert_eq!(scenario.end_condition.kind, "solid");
+
+    let mut layers = Vec::new();
+    for seed in SEEDS {
+        let record = sim::run(&scenario, seed);
+        if !record.quality_gate.is_accepted() {
+            continue;
+        }
+        assert_eq!(record.end.condition, "solid", "seed {seed}");
+        // Neighbouring layers in the same colour would merge into one band.
+        let colours: Vec<usize> = record
+            .settles
+            .iter()
+            .map(|settle| settle.colour as usize % BALL_SLOTS)
+            .collect();
+        assert!(
+            colours.windows(2).all(|pair| pair[0] != pair[1]),
+            "seed {seed}: neighbouring layers share a colour: {colours:?}"
+        );
+        layers.push(record.settles.len());
+    }
+    layers.sort();
+    layers.dedup();
+    assert!(layers.len() > 1, "Seeds give different numbers of layers");
 }
 
 #[test]

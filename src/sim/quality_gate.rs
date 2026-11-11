@@ -5,7 +5,7 @@
 use serde::Serialize;
 
 use super::end_condition::TIME_CAP;
-use super::record::SimRecord;
+use super::record::{substep_to_seconds, SimRecord};
 use crate::scenario::Scenario;
 
 /// Whether a Seed may be rendered.
@@ -40,6 +40,37 @@ pub enum Rejection {
     TooLong { seconds: f64, max: f64 },
     #[error("too few Boundary Hits ({hits}, minimum {min})")]
     TooQuiet { hits: usize, min: usize },
+    #[error("the Film's final stretch drags on ({seconds:.1} s from under 1% left to cleared, maximum {max} s)")]
+    FinalStretchTooLong { seconds: f64, max: f64 },
+    #[error("a ball ends too big ({fraction:.2} of the Arena radius, maximum {max})")]
+    BallTooBig { fraction: f64, max: f64 },
+}
+
+/// The largest ball's radius when the run ended, as a fraction of the Arena
+/// radius then.
+fn ball_radius_at_end(record: &SimRecord) -> f64 {
+    let largest = record
+        .final_balls
+        .iter()
+        .map(|b| b.radius)
+        .fold(0.0, f64::max);
+    largest / record.final_arena_radius
+}
+
+/// The Film's final stretch starts when Film left first drops below this.
+pub const FINAL_STRETCH_BELOW: f64 = 0.01;
+
+/// Seconds from Film left first dropping below [`FINAL_STRETCH_BELOW`] to the
+/// Film being cleared, or to the End Condition if it is not cleared by then.
+/// `None` without a Film or if it never got that low before the End Condition.
+fn final_stretch(record: &SimRecord) -> Option<f64> {
+    let end = record.end.substep;
+    let before_end = || record.film_left.iter().filter(|s| s.substep <= end);
+    let start = before_end().find(|s| s.left < FINAL_STRETCH_BELOW)?.substep;
+    let cleared = before_end()
+        .find(|s| s.left == 0.0)
+        .map_or(end, |s| s.substep);
+    Some(substep_to_seconds(cleared - start))
 }
 
 /// Judges a run of `scenario` (with this Seed's ranges resolved) from its record.
@@ -67,6 +98,18 @@ pub fn judge(scenario: &Scenario, record: &SimRecord) -> Verdict {
             hits,
             min: gate.min_boundary_hits,
         })
+    } else if let Some((seconds, max)) = gate
+        .max_final_stretch
+        .and_then(|max| Some((final_stretch(record)?, max)))
+        .filter(|(seconds, max)| seconds > max)
+    {
+        Some(Rejection::FinalStretchTooLong { seconds, max })
+    } else if let Some((fraction, max)) = gate
+        .max_ball_radius_at_end
+        .map(|max| (ball_radius_at_end(record), max))
+        .filter(|(fraction, max)| fraction > max)
+    {
+        Some(Rejection::BallTooBig { fraction, max })
     } else {
         None
     };

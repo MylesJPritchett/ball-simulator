@@ -268,13 +268,17 @@ impl SimState {
     }
 
     /// Keeps every ball inside the Arena after Rules have changed radii: a
-    /// ball is never larger than the Arena, and one poking past the Boundary
-    /// (or a Ring whose inner edge overlaps the Peg) is moved straight inward
-    /// until it touches it. Velocity is unchanged.
+    /// ball is never larger than the Arena, a Ring round a Peg never has a
+    /// hole smaller than the Peg, and one poking past the Boundary (or a Ring
+    /// whose inner edge overlaps the Peg) is moved straight inward until it
+    /// touches it. Velocity is unchanged.
     /// Escaping balls are left to carry on out.
     pub fn contain(&mut self) {
         let SimState { arena, balls, .. } = self;
         for ball in balls.iter_mut().filter(|ball| !ball.escaping) {
+            if let (Some(peg), Some(thickness)) = (arena.peg_radius, ball.thickness) {
+                ball.radius = ball.radius.max(peg + thickness);
+            }
             ball.radius = ball.radius.min(arena.radius);
             let limit = arena.room(ball.radius, ball.thickness);
             let dist = ball.pos.length();

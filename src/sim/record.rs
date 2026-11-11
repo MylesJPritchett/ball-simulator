@@ -67,8 +67,8 @@ pub struct BoundaryHit {
 }
 
 /// A surface of the Arena: the one a Boundary Hit landed on, or the one a
-/// Ring settled against (a Ring settles only into the Boundary, becoming the
-/// new Boundary so the Arena shrinks by its thickness).
+/// Ring settled against (into the Boundary, becoming the new Boundary so the
+/// Arena shrinks by its thickness, or onto the Peg, which grows by it).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Surface {

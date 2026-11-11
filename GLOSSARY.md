@@ -87,7 +87,7 @@ A fixed solid disc at the centre of the Arena that a Ring moves around: the Ring
 _Avoid_: Post, hub, core
 
 **Settle**:
-What a Ring that can no longer move does. Once it has grown to fill the Arena (which forces it concentric) it settles into the Boundary: it stops being a ball and becomes the new Boundary, a layer of the Arena in its own colour, so the Arena shrinks by the Ring's thickness and a new Ring starts at the centre. When the Arena is too small for another Ring it is **solid**, a Terminal State.
+What a Ring that can no longer move does. Once it has grown to fill the Arena (which forces it concentric) it settles into the Boundary: it stops being a ball and becomes the new Boundary, a layer of the Arena in its own colour, so the Arena shrinks by the Ring's thickness and a new Ring starts at the centre. Round a Peg, once it has shrunk until its hole fits the Peg (which also forces it concentric) it settles onto the Peg instead: it becomes a layer of the Peg in its own colour, so the Peg grows by the Ring's thickness and a new Ring starts with its outer edge on the Boundary. When the Arena is too small for another Ring, or the Peg too big for one to move round it, the Arena is **solid**, a Terminal State.
 _Avoid_: Lock in, freeze, stick
 
 **Boundary Hit**:

@@ -273,6 +273,13 @@ impl Scenario {
                 self.invalid("quality_gate.min_duration must not exceed quality_gate.max_duration")
             );
         }
+        let films = self.rules.iter().filter(|r| r.kind == crate::rules::FILM);
+        if films.count() > 1 {
+            return Err(self.invalid(format!(
+                "rules: at most one '{}' Rule per Scenario",
+                crate::rules::FILM
+            )));
+        }
         // Building Rules and End Conditions validates their kinds and parameters.
         let sets_max_speed = self
             .raw

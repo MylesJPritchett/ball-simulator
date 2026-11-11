@@ -26,6 +26,9 @@ pub struct SimRecord {
     pub boundary_hits: Vec<BoundaryHit>,
     /// Ball count over time: one sample at substep 0 and one whenever it changes.
     pub ball_count: Vec<BallCountSample>,
+    /// Film left over time: one sample at substep 0 and one whenever it
+    /// changes. Empty without a Film.
+    pub film_left: Vec<FilmLeftSample>,
     /// Which End Condition fired and when.
     pub end: EndEvent,
     /// Timing of the Play-out, freeze, flash and hold that follow the End
@@ -71,6 +74,13 @@ impl BoundaryHit {
 pub struct BallCountSample {
     pub substep: u64,
     pub count: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct FilmLeftSample {
+    pub substep: u64,
+    /// The fraction of the Arena that still has Film (see `Film::left`).
+    pub left: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

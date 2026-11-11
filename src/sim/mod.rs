@@ -7,6 +7,7 @@
 
 pub mod end_condition;
 pub mod ending;
+mod film;
 pub mod quality_gate;
 pub mod record;
 pub mod rng;
@@ -14,7 +15,8 @@ mod state;
 
 pub use ending::{Accent, Ending, EndingStyle, Finale, PlayOut};
 pub use quality_gate::{Rejection, Verdict};
-pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
+pub use film::Film;
+pub use record::{BallCountSample, BoundaryHit, EndEvent, FilmLeftSample, SimRecord, SimStats};
 pub use state::{Arena, Ball, Crack, Gap, Shatter, SimState, Vec2};
 
 use crate::audio::music::Sound;
@@ -58,6 +60,7 @@ pub struct Simulation {
     population_cap: usize,
     boundary_hits: Vec<BoundaryHit>,
     ball_count: Vec<BallCountSample>,
+    film_left: Vec<FilmLeftSample>,
     stats: SimStats,
     end: Option<EndEvent>,
     /// The fired End Condition's Ending style.
@@ -107,6 +110,14 @@ impl Simulation {
             substep: 0,
             count: state.balls.len(),
         }];
+        let film_left = state
+            .film
+            .iter()
+            .map(|film| FilmLeftSample {
+                substep: 0,
+                left: film.left(),
+            })
+            .collect();
 
         Simulation {
             seed,
@@ -124,6 +135,7 @@ impl Simulation {
             scenario: resolved,
             boundary_hits: Vec::new(),
             ball_count,
+            film_left,
             stats: SimStats::default(),
             end: None,
             ending_style: EndingStyle::default(),
@@ -211,6 +223,11 @@ impl Simulation {
             max_speed: self.max_speed,
         };
         let radius_before = self.state.arena.radius;
+        // Where each ball was, by id, for the Film it wipes on the way.
+        let start: Vec<(u32, Vec2)> = match self.state.film {
+            Some(_) => self.state.balls.iter().map(|b| (b.id, b.pos)).collect(),
+            None => Vec::new(),
+        };
         for rule in &mut self.rules {
             rule.on_substep(&mut self.state, &mut ctx);
         }
@@ -258,6 +275,7 @@ impl Simulation {
         // Rules may have grown balls past the Boundary.
         self.state.contain();
         self.state.limit_speed(self.max_speed);
+        self.wipe_film(&start);
 
         self.substep = completed;
         self.measure();
@@ -265,6 +283,22 @@ impl Simulation {
             self.check_end();
         }
         self.check_freeze();
+    }
+
+    /// Every ball wipes the Film its disc swept this substep, from where it
+    /// was at the start (`start`, by id; a ball added since wipes only where
+    /// it is now) to where it is, so a fast ball leaves no gaps.
+    fn wipe_film(&mut self, start: &[(u32, Vec2)]) {
+        let Some(film) = &mut self.state.film else {
+            return;
+        };
+        for ball in &self.state.balls {
+            // Balls stay in id order (they are only appended or removed).
+            let from = start
+                .binary_search_by_key(&ball.id, |&(id, _)| id)
+                .map_or(ball.pos, |i| start[i].1);
+            film.wipe(from, ball.pos, ball.radius);
+        }
     }
 
     fn measure(&mut self) {
@@ -279,6 +313,15 @@ impl Simulation {
             let overshoot = ball.pos.length() + ball.radius - arena.radius;
             if overshoot > self.stats.max_boundary_overshoot {
                 self.stats.max_boundary_overshoot = overshoot;
+            }
+        }
+        if let Some(film) = &self.state.film {
+            let left = film.left();
+            if self.film_left.last().map(|s| s.left) != Some(left) {
+                self.film_left.push(FilmLeftSample {
+                    substep: self.substep,
+                    left,
+                });
             }
         }
         let count = self.state.balls.len();
@@ -336,6 +379,7 @@ impl Simulation {
             final_arena_radius: self.state.arena.radius,
             boundary_hits: self.boundary_hits,
             ball_count: self.ball_count,
+            film_left: self.film_left,
             ending,
             end,
             stats: self.stats,
@@ -405,6 +449,9 @@ fn hash_state(state: &SimState, substep: u64) -> u64 {
     };
     feed(substep);
     feed(state.arena.radius.to_bits());
+    if let Some(film) = &state.film {
+        feed(film.left().to_bits());
+    }
     feed(state.balls.len() as u64);
     for b in &state.balls {
         feed(b.id as u64);

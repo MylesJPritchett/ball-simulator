@@ -11,6 +11,7 @@
 mod change_colour;
 mod crack;
 mod drag;
+mod film;
 mod gap;
 mod gravity;
 mod grow;
@@ -38,6 +39,7 @@ pub const SHRINK: &str = "shrink";
 pub const PLAY_NOTE: &str = "play_note";
 pub const GAP: &str = "gap";
 pub const CRACK: &str = "crack";
+pub const FILM: &str = "film";
 
 /// Per-call context handed to Rules by the simulation.
 pub struct RuleContext<'a> {
@@ -113,6 +115,7 @@ pub fn build(spec: &RuleSpec) -> Result<Box<dyn Rule>, String> {
         PLAY_NOTE => Ok(Box::new(play_note::PlayNote::from_spec(spec)?)),
         GAP => Ok(Box::new(gap::Gap::from_spec(spec)?)),
         CRACK => Ok(Box::new(crack::Crack::from_spec(spec)?)),
+        FILM => Ok(Box::new(film::Film::from_spec(spec)?)),
         other => Err(format!("unknown Rule '{other}'")),
     }
 }

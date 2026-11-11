@@ -100,6 +100,10 @@ pub struct BallSpec {
     /// Speed limit in units per second, always enforced on every ball.
     #[serde(default = "default_max_speed")]
     pub max_speed: f64,
+    /// Present makes the ball a Ring this thick: its hole's radius is its
+    /// radius minus its thickness. Must be less than the radius.
+    #[serde(default)]
+    pub thickness: Option<f64>,
 }
 
 /// Max speed for Scenarios that don't set one.
@@ -169,6 +173,12 @@ impl Scenario {
             return Err(
                 lowest.invalid("ball.radius must be smaller than arena.radius across their ranges")
             );
+        }
+        if let Some(thickness) = highest.ball.thickness {
+            if thickness >= lowest.ball.radius {
+                return Err(lowest
+                    .invalid("ball.thickness must be less than ball.radius across their ranges"));
+            }
         }
         Ok(Scenario { raw, ..lowest })
     }
@@ -256,6 +266,13 @@ impl Scenario {
             return Err(
                 self.invalid("ball.radius must be greater than 0 and smaller than arena.radius")
             );
+        }
+        if let Some(thickness) = self.ball.thickness {
+            if !(thickness.is_finite() && thickness > 0.0 && thickness < self.ball.radius) {
+                return Err(
+                    self.invalid("ball.thickness must be greater than 0 and less than ball.radius")
+                );
+            }
         }
         self.look.validate().map_err(|m| self.invalid(m))?;
         crate::meta::check_templates(self).map_err(|m| self.invalid(m))?;

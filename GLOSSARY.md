@@ -78,6 +78,10 @@ The Boundary breaking all the way round at the first Boundary Hit at max speed: 
 **Escape**:
 A ball passing out through an opening a Rule made in the Boundary (such as a Gap). An escaping ball is no longer held by the Boundary or pulled by gravity and drag, so it flies straight out of the frame.
 
+**Ring**:
+A ball with a hollow centre, given by its thickness: its hole's radius is its radius minus its thickness, and the thickness stays the same as the ball grows or shrinks. Its outer edge bounces off the Boundary; on its own the hole is only how it looks, so it moves exactly like a solid ball of the same radius.
+_Avoid_: Hoop, donut, hollow ball
+
 **Boundary Hit**:
 A ball touching the Boundary; the default trigger for sounds and on-hit Rules. Balls pass through each other unless a Rule says otherwise.
 _Avoid_: Collision, bounce, edge hit

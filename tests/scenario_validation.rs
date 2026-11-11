@@ -265,3 +265,42 @@ fn crack_has_no_parameters() {
         "{err}"
     );
 }
+
+/// A complete Scenario whose ball (radius 30) is a Ring `thickness` thick.
+fn ring(thickness: &str) -> String {
+    complete().replace(
+        "speed = 900.0",
+        &format!("speed = 900.0\nthickness = {thickness}"),
+    )
+}
+
+#[test]
+fn a_ring_thickness_less_than_its_radius_is_valid() {
+    Scenario::from_toml_str("ring", &ring("10.0")).expect("a valid Ring");
+    Scenario::from_toml_str("ring", &ring("{ min = 4.0, max = 12.0 }")).expect("a valid range");
+}
+
+#[test]
+fn a_ring_thickness_must_be_positive_finite_and_less_than_its_radius() {
+    for bad in ["0.0", "-3.0", "nan", "inf", "30.0", "45.0"] {
+        let err = error_for(&ring(bad));
+        assert!(
+            err.contains("broken")
+                && err.contains("ball.thickness must be greater than 0 and less than ball.radius"),
+            "thickness {bad}: {err}"
+        );
+    }
+}
+
+#[test]
+fn a_ring_thickness_range_must_stay_less_than_the_radius_range() {
+    // Each end alone is fine, but a Seed could draw a thickness of 28 with a
+    // radius of 25.
+    let toml = ring("{ min = 4.0, max = 28.0 }")
+        .replace("radius = 30.0", "radius = { min = 25.0, max = 30.0 }");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("ball.thickness must be less than ball.radius across their ranges"),
+        "{err}"
+    );
+}

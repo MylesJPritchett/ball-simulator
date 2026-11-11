@@ -85,11 +85,12 @@ impl Simulation {
         let start_angle = rng.range_f64(0.0, std::f64::consts::TAU);
         let start_dist = max_start * rng.next_f64().sqrt();
         let dir = rng.range_f64(0.0, std::f64::consts::TAU);
-        state.spawn(
+        let first = state.spawn(
             Vec2::from_angle(start_angle) * start_dist,
             Vec2::from_angle(dir) * ball.speed,
             ball.radius,
         );
+        state.balls[first].thickness = ball.thickness;
         let mut ctx = RuleContext {
             rng: &mut rng,
             substep: 0,

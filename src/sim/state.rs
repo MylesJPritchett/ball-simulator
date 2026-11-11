@@ -191,6 +191,11 @@ pub struct Ball {
     /// is on its way out. The Boundary no longer holds it and forces no
     /// longer act on it, so it flies straight out.
     pub escaping: bool,
+    /// `Some` for a Ring: how thick it is (its hole's radius is `radius`
+    /// minus this). It stays the same when the radius changes. Without a Peg
+    /// the hole is only how a Ring looks; it moves like a solid ball.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thickness: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -287,6 +292,7 @@ impl SimState {
             radius,
             colour: 0,
             escaping: false,
+            thickness: None,
         });
         self.balls.len() - 1
     }

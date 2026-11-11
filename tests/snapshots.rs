@@ -211,3 +211,17 @@ fn shrinking_arena_seed_1() {
         },
     );
 }
+
+#[test]
+fn shrinking_rings_seed_1() {
+    assert_seed_1(
+        "shrinking_rings",
+        Snapshot {
+            boundary_hits: 231,
+            final_ball_count: 0,
+            end_condition: "solid",
+            end_substep: 15319,
+            final_state_hash: 6883116001059761684,
+        },
+    );
+}

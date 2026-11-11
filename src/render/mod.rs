@@ -570,9 +570,8 @@ impl Renderer {
 
         // Counter: a large number with a small caption under it.
         let region = layout::counter();
-        let value = self.counter.read(sim);
-        let number = value.to_string();
-        let label = self.counter.label(value);
+        let number = self.counter.text(sim);
+        let label = self.counter.label(self.counter.read(sim));
         let gap = COUNTER_LABEL_PX * 0.6;
         let block =
             COUNTER_NUMBER_PX * text::CAP_HEIGHT + gap + COUNTER_LABEL_PX * text::CAP_HEIGHT;

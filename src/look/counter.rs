@@ -14,6 +14,9 @@ pub enum Counter {
     BallCount,
     /// Speed of the fastest ball, in simulation units per second (rounded).
     Speed,
+    /// Film left, as a percentage rounded up: never 0 while any Film is left.
+    /// 0 in a Scenario without a `film` Rule.
+    FilmLeft,
 }
 
 impl Counter {
@@ -29,6 +32,21 @@ impl Counter {
                 .map(|b| b.vel.length())
                 .fold(0.0, f64::max)
                 .round() as u64,
+            // The tolerance keeps float noise (0.37 * 100 = 37.000000000000004)
+            // from rounding up a whole percent; a single Film cell is far
+            // more than it.
+            Counter::FilmLeft => sim.state().film.as_ref().map_or(0, |film| {
+                (film.left() * 100.0 - 1e-9).ceil().max(0.0) as u64
+            }),
+        }
+    }
+
+    /// The Counter's value as drawn: the number, with its unit if it has one.
+    pub fn text(self, sim: &Simulation) -> String {
+        let value = self.read(sim);
+        match self {
+            Counter::FilmLeft => format!("{value}%"),
+            _ => value.to_string(),
         }
     }
 
@@ -40,6 +58,7 @@ impl Counter {
             (Counter::BallCount, 1) => "BALL",
             (Counter::BallCount, _) => "BALLS",
             (Counter::Speed, _) => "SPEED",
+            (Counter::FilmLeft, _) => "FILM LEFT",
         }
     }
 }

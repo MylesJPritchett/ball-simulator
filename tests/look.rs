@@ -5,7 +5,7 @@ mod support;
 
 use std::collections::BTreeSet;
 
-use ball_simulator::look::palette;
+use ball_simulator::look::{palette, Counter};
 use ball_simulator::scenario::Scenario;
 use ball_simulator::sim::{SimRecord, Simulation};
 use support::{run, scenario, MINIMAL};
@@ -165,4 +165,59 @@ fn unknown_counter_is_rejected() {
         .expect_err("unknown Counter should be rejected")
         .to_string();
     assert!(err.contains("vibes"), "{err}");
+}
+
+/// Steps a Scenario frame by frame, collecting the Counter text as the
+/// renderer draws it, with the Film left at that frame.
+fn counter_text_every_frame(toml: &str, seed: u64) -> Vec<(String, f64)> {
+    let scenario = scenario(toml);
+    let counter = scenario.look.counter;
+    let mut sim = Simulation::new(&scenario, seed);
+    let mut readings = Vec::new();
+    loop {
+        let left = sim.state().film.as_ref().map_or(0.0, |f| f.left());
+        readings.push((counter.text(&sim), left));
+        if sim.is_frozen() {
+            break;
+        }
+        sim.step_frame();
+    }
+    readings
+}
+
+/// A big ball wiping a Film for `seconds`, with the Film left Counter.
+fn wiping_with_film_left_counter(seconds: f64) -> String {
+    MINIMAL
+        .replace("time_cap = 5.0", &format!("time_cap = {seconds:?}"))
+        .replace("radius = 30.0", "radius = 300.0")
+        + "\n[[rules]]\nkind = \"film\"\nregrow = 0.0\n"
+        + "\n[look]\ncounter = \"film_left\"\n"
+}
+
+#[test]
+fn film_left_counter_counts_down_from_100_percent_to_0_percent() {
+    // The ball grows on every Boundary Hit until it fills the Arena, wiping
+    // all of the Film.
+    let growing =
+        wiping_with_film_left_counter(30.0) + "\n[[rules]]\nkind = \"grow\"\namount = 20.0\n";
+    let readings = counter_text_every_frame(&growing, 1);
+
+    assert_eq!(readings[0].0, "100%");
+    let (last, left) = readings.last().unwrap();
+    assert_eq!(*left, 0.0, "the Film should be cleared by the end");
+    assert_eq!(last, "0%");
+    assert_eq!(Counter::FilmLeft.label(0), "FILM LEFT");
+}
+
+#[test]
+fn film_left_counter_never_shows_0_percent_while_film_is_left() {
+    // After 30 s a tiny patch, well under half a percent, is still left.
+    let readings = counter_text_every_frame(&wiping_with_film_left_counter(30.0), 1);
+
+    let (last, left) = readings.last().unwrap();
+    assert!(*left > 0.0 && *left < 0.005, "left {left}");
+    assert_eq!(last, "1%");
+    for (text, left) in &readings {
+        assert_eq!(text == "0%", *left == 0.0, "{text} with {left} left");
+    }
 }

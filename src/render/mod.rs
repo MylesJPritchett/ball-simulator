@@ -538,8 +538,10 @@ impl Renderer {
     }
 
     /// Each settled Ring as a concentric annulus in its colour, where it was
-    /// as it settled, so nothing moves when one settles. Once the Arena is
-    /// solid, what is left of it is filled in the last layer's colour.
+    /// as it settled, so nothing moves when one settles; layers settled onto
+    /// the Peg cover it, so it reads as its layers on its starting colour.
+    /// Once the Arena is solid, what is left of it (round the Peg, if there
+    /// is one) is filled in the last layer's colour.
     fn draw_layers(&mut self, sim: &Simulation, palette: &Palette) {
         let state = sim.state();
         let (x, y) = self.to_screen(0.0, 0.0);
@@ -567,11 +569,16 @@ impl Renderer {
         }
         if let (true, Some(last)) = (state.arena.solid, state.settles.last()) {
             paint.set_color(rgb(palette.ball(last.colour as usize)));
-            if let Some(centre) = PathBuilder::from_circle(x, y, self.boundary_radius(sim)) {
+            let mut pb = PathBuilder::new();
+            pb.push_circle(x, y, self.boundary_radius(sim));
+            if let Some(peg) = state.arena.peg_radius {
+                pb.push_circle(x, y, peg as f32 * self.scale);
+            }
+            if let Some(rest) = pb.finish() {
                 self.pixmap.fill_path(
-                    &centre,
+                    &rest,
                     &paint,
-                    FillRule::Winding,
+                    FillRule::EvenOdd,
                     Transform::identity(),
                     None,
                 );

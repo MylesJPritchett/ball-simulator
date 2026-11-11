@@ -3,6 +3,7 @@
 mod support;
 
 use ball_simulator::scenario::Scenario;
+use ball_simulator::sim::{Film, Vec2};
 use support::{run, MINIMAL, NEVER_ENDS};
 
 /// A `film` Rule that never grows back.
@@ -110,4 +111,103 @@ fn regrow_can_be_a_range() {
 fn the_same_seed_wipes_the_same_film() {
     let toml = format!("{MINIMAL}{FILM}");
     assert_eq!(run(&toml, 4), run(&toml, 4));
+}
+
+/// A `film` Rule whose edge grows back at `regrow` units per second.
+fn regrowing(regrow: f64) -> String {
+    FILM.replace("0.0", &format!("{regrow:?}"))
+}
+
+#[test]
+fn wiped_film_grows_back_with_regrowth() {
+    // The edge grows back faster than the slow ball wipes its band.
+    let toml = straight_pass(30.0, 100.0, 2.0).replace(FILM, &regrowing(200.0));
+    let record = run(&toml, 3);
+
+    assert!(
+        record
+            .film_left
+            .windows(2)
+            .any(|pair| pair[1].left > pair[0].left),
+        "Film left never went up"
+    );
+}
+
+/// A Film over an Arena of radius 460 with a hole of `radius` wiped in the
+/// middle.
+fn holed(radius: f64) -> Film {
+    let mut film = Film::new(460.0);
+    film.wipe(Vec2::new(0.0, 0.0), Vec2::new(0.0, 0.0), radius);
+    film
+}
+
+#[test]
+fn the_edge_closes_in_at_the_regrow_distance() {
+    // A hole of radius 100 grown back 40 units is a hole of radius 60:
+    // 60^2 / 460^2 = 1.7013% of the Arena still cleared, from 4.7259%.
+    let mut film = holed(100.0);
+    film.regrow(40.0);
+
+    let cleared = 1.0 - film.left();
+    assert!((cleared - 0.017013).abs() < 0.0015, "cleared {cleared}");
+}
+
+#[test]
+fn film_far_from_the_edge_comes_back_only_as_the_edge_reaches_it() {
+    let mut film = holed(100.0);
+    film.regrow(40.0);
+
+    // 80 from the centre is 20 inside the old edge: grown back.
+    assert_eq!(film.coverage_at(Vec2::new(80.0, 0.0)), 1.0);
+    assert_eq!(film.coverage_at(Vec2::new(0.0, -80.0)), 1.0);
+    assert_eq!(film.coverage_at(Vec2::new(-57.0, 57.0)), 1.0);
+    // 40 from the centre is 20 beyond the edge: still cleared.
+    assert_eq!(film.coverage_at(Vec2::new(40.0, 0.0)), 0.0);
+    assert_eq!(film.coverage_at(Vec2::new(-28.0, -28.0)), 0.0);
+
+    film.regrow(80.0);
+    assert_eq!(film.left(), 1.0);
+}
+
+#[test]
+fn regrowth_in_small_steps_adds_up() {
+    let mut whole = holed(100.0);
+    whole.regrow(40.0);
+    let mut stepped = holed(100.0);
+    for _ in 0..400 {
+        stepped.regrow(0.1);
+    }
+    assert!((whole.left() - stepped.left()).abs() < 0.001);
+}
+
+#[test]
+fn the_same_seed_grows_back_the_same_film() {
+    let toml = format!("{MINIMAL}{}", regrowing(50.0));
+    assert_eq!(run(&toml, 4), run(&toml, 4));
+}
+
+#[test]
+fn film_left_stays_at_zero_once_it_gets_there() {
+    // The ball grows on every Boundary Hit until it fills the Arena and has
+    // wiped all of it; the run plays out after that.
+    let toml = format!(
+        "{MINIMAL}\n[[rules]]\nkind = \"grow\"\namount = 40.0\n{}",
+        regrowing(50.0)
+    );
+    let film_left = run(&toml, 2).film_left;
+
+    let first_cleared = film_left
+        .iter()
+        .position(|s| s.left == 0.0)
+        .expect("the Film is cleared");
+    assert_eq!(first_cleared, film_left.len() - 1, "{film_left:?}");
+}
+
+#[test]
+fn once_no_film_is_left_none_grows_back() {
+    let mut film = holed(460.0);
+    assert!(film.is_cleared());
+
+    film.regrow(100.0);
+    assert!(film.is_cleared());
 }

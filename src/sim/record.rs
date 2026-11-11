@@ -24,6 +24,8 @@ pub struct SimRecord {
     /// screen, so hits during it are here too (and play their notes), up to
     /// and including the freeze substep.
     pub boundary_hits: Vec<BoundaryHit>,
+    /// Every Ring that settled (see the `settle` Rule), in order.
+    pub settles: Vec<Settle>,
     /// Ball count over time: one sample at substep 0 and one whenever it changes.
     pub ball_count: Vec<BallCountSample>,
     /// Which End Condition fired and when.
@@ -64,7 +66,9 @@ pub struct BoundaryHit {
     pub plays_note: bool,
 }
 
-/// The surface a Boundary Hit landed on.
+/// A surface of the Arena: the one a Boundary Hit landed on, or the one a
+/// Ring settled against (a Ring settles only into the Boundary, becoming the
+/// new Boundary so the Arena shrinks by its thickness).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Surface {
@@ -75,6 +79,28 @@ pub enum Surface {
 }
 
 impl BoundaryHit {
+    pub fn time(&self) -> f64 {
+        substep_to_seconds(self.substep)
+    }
+}
+
+/// A Ring settling: it stopped moving and became part of the Arena, drawn as
+/// a layer where it was.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct Settle {
+    /// Substeps completed when it settled; time = substep / SUBSTEP_HZ.
+    pub substep: u64,
+    /// The Ring's palette colour index, which its layer keeps.
+    pub colour: u32,
+    /// What it settled against.
+    pub surface: Surface,
+    /// The Ring's radius as it settled. It was concentric with the Arena.
+    pub radius: f64,
+    /// The Ring's thickness: its layer runs from `radius - thickness` to `radius`.
+    pub thickness: f64,
+}
+
+impl Settle {
     pub fn time(&self) -> f64 {
         substep_to_seconds(self.substep)
     }

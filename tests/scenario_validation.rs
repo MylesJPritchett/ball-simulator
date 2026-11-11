@@ -373,3 +373,47 @@ fn a_peg_needs_a_ring() {
         "{err}"
     );
 }
+
+/// MINIMAL ending `solid`, its ball a Ring 10 thick if `ring`, with `rules`.
+fn solid(ring: bool, rules: &str) -> String {
+    let ball = if ring {
+        MINIMAL.replace("speed = 900.0", "speed = 900.0\nthickness = 10.0")
+    } else {
+        MINIMAL.to_string()
+    };
+    format!("{ball}{rules}\n[end_condition]\nkind = \"solid\"\n")
+}
+
+const GROW_AND_SETTLE: &str =
+    "\n[[rules]]\nkind = \"grow\"\namount = 5.0\n\n[[rules]]\nkind = \"settle\"\n";
+
+#[test]
+fn solid_needs_a_rule_that_settles_rings() {
+    let err = error_for(&solid(true, "\n[[rules]]\nkind = \"grow\"\namount = 5.0\n"));
+    assert!(
+        err.contains("broken")
+            && err.contains("end_condition: End Condition 'solid' needs a Rule that settles Rings"),
+        "{err}"
+    );
+}
+
+#[test]
+fn solid_needs_a_ring_ball() {
+    let err = error_for(&solid(false, GROW_AND_SETTLE));
+    assert!(
+        err.contains("broken")
+            && err.contains("end_condition: End Condition 'solid' needs a Ring ball"),
+        "{err}"
+    );
+}
+
+#[test]
+fn solid_with_a_ring_and_settle_is_valid() {
+    Scenario::from_toml_str("ok", &solid(true, GROW_AND_SETTLE)).expect("a valid Scenario");
+}
+
+#[test]
+fn settle_has_no_parameters() {
+    let err = error_for(&solid(true, &format!("{GROW_AND_SETTLE}speed = 2.0\n")));
+    assert!(err.contains("rules[1]") && err.contains("speed"), "{err}");
+}

@@ -86,6 +86,10 @@ _Avoid_: Hoop, donut, hollow ball
 A fixed solid disc at the centre of the Arena that a Ring moves around: the Ring's inner edge bounces off it as its outer edge bounces off the Boundary. Only a Ring can be in an Arena with a Peg.
 _Avoid_: Post, hub, core
 
+**Settle**:
+What a Ring that can no longer move does. Once it has grown to fill the Arena (which forces it concentric) it settles into the Boundary: it stops being a ball and becomes the new Boundary, a layer of the Arena in its own colour, so the Arena shrinks by the Ring's thickness and a new Ring starts at the centre. When the Arena is too small for another Ring it is **solid**, a Terminal State.
+_Avoid_: Lock in, freeze, stick
+
 **Boundary Hit**:
 A ball touching the Boundary or a Peg; the default trigger for sounds and on-hit Rules, which treat both alike. A hit says which surface it was on and where on that surface it landed. Balls pass through each other unless a Rule says otherwise.
 _Avoid_: Collision, bounce, edge hit

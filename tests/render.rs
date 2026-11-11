@@ -826,3 +826,101 @@ fn a_peg_hit_glows_on_the_peg_not_the_boundary() {
     }
     assert!(differing > 0, "the Peg hits glow");
 }
+
+/// A Ring (radius 60, thickness 50) that grows by 200 on every Boundary Hit
+/// and settles in two hits a cycle: eight layers, 460 to 60, then solid. It
+/// changes colour on every hit, so neighbouring layers differ.
+fn settling() -> String {
+    MINIMAL
+        .replace("time_cap = 5.0", "time_cap = 60.0")
+        .replace("radius = 30.0", "radius = 60.0")
+        .replace("speed = 900.0", "speed = 3000.0\nthickness = 50.0")
+        + "\n[[rules]]\nkind = \"grow\"\namount = 200.0\n\
+           \n[[rules]]\nkind = \"change_colour\"\n\
+           \n[[rules]]\nkind = \"settle\"\n\
+           \n[look]\ntrails = false\nglow = false\n\
+           \n[end_condition]\nkind = \"solid\"\n"
+}
+
+/// Pixel at `r` sim units from the Arena's centre, at `degrees`.
+fn at_radius(frame: &[u8], r: f64, degrees: f32) -> [u8; 3] {
+    let arena = layout::arena();
+    let scale = arena.radius / 460.0;
+    let (sin, cos) = degrees.to_radians().sin_cos();
+    let r = r as f32 * scale;
+    pixel(frame, arena.center_x + cos * r, arena.center_y + sin * r)
+}
+
+#[test]
+fn settled_layers_are_drawn_in_their_colours_inside_a_boundary_that_stays_put() {
+    let toml = settling();
+    let record = sim::run(&scenario(&toml), 1);
+    assert_eq!(record.settles.len(), 8);
+    let boundary_ring = layout::arena().radius + BOUNDARY_WIDTH / 2.0;
+    let mut checked = 0;
+    // No flash, which would tint the layers at the Ending.
+    let no_flash = |ending: Ending| Ending {
+        flash_substeps: 0,
+        ..ending
+    };
+    draw_frames_with(&toml, 1, record.ending.frames(), no_flash, |sim, frame| {
+        let palette = sim.palette();
+        for step in 0..36 {
+            let degrees = step as f32 * 10.0;
+            let (sin, cos) = degrees.to_radians().sin_cos();
+            let arena = layout::arena();
+            let (x, y) = (
+                arena.center_x + cos * boundary_ring,
+                arena.center_y + sin * boundary_ring,
+            );
+            assert_eq!(pixel(frame, x, y), palette.boundary, "the Boundary stays");
+            for settle in &sim.state().settles {
+                let mid = settle.radius - settle.thickness / 2.0;
+                assert_eq!(
+                    at_radius(frame, mid, degrees),
+                    palette.ball(settle.colour as usize),
+                    "layer at {} in its colour",
+                    settle.radius
+                );
+            }
+        }
+        checked += sim.state().settles.len();
+    });
+    assert!(checked > 8, "{checked} layers checked");
+}
+
+#[test]
+fn a_solid_arena_is_filled_to_the_centre_and_the_flash_covers_the_whole_disc() {
+    let toml = settling();
+    let record = sim::run(&scenario(&toml), 1);
+    let fired = (record.end.substep / SUBSTEPS_PER_FRAME + 1) as usize;
+    let mut frames = Vec::new();
+    let mut colours = None;
+    draw_frames(&toml, 1, record.ending.frames(), |sim, frame| {
+        frames.push(frame.to_vec());
+        let last = sim.state().settles.last().map(|s| s.colour as usize);
+        colours = Some((
+            sim.palette().ball(last.unwrap_or(0)),
+            sim.palette().background,
+        ));
+    });
+    let (last_layer, background) = colours.unwrap();
+    let held = frames.last().unwrap();
+    let flashed = &frames[fired];
+    // From the centre out to the Arena's edge, through every layer.
+    for r in (0..46).map(|k| k as f64 * 10.0) {
+        for step in 0..12 {
+            let degrees = step as f32 * 30.0;
+            let after = at_radius(held, r, degrees);
+            assert_ne!(after, background, "solid at r {r}");
+            if r < 60.0 {
+                assert_eq!(after, last_layer, "the centre is filled at r {r}");
+            }
+            let bright = |c: [u8; 3]| c.map(u32::from).iter().sum::<u32>();
+            assert!(
+                bright(at_radius(flashed, r, degrees)) > bright(after),
+                "the flash covers r {r} at {degrees}"
+            );
+        }
+    }
+}

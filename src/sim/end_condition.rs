@@ -20,6 +20,7 @@ pub const ARENA_COVERED: &str = "arena_covered";
 pub const VANISHED: &str = "vanished";
 pub const ESCAPED: &str = "escaped";
 pub const MELTDOWN: &str = "meltdown";
+pub const SOLID: &str = "solid";
 
 pub trait EndCondition {
     /// Id written to `SimRecord::end.condition`.
@@ -92,6 +93,21 @@ pub fn build(scenario: &Scenario) -> Result<Box<dyn EndCondition>, String> {
             Ok(Box::new(Meltdown {
                 cap: scenario.population_cap,
             }))
+        }
+        SOLID => {
+            no_params(spec)?;
+            needs_rule(
+                scenario,
+                |rule| rule.settles_rings(),
+                "settles Rings",
+                crate::rules::SETTLE,
+            )?;
+            if scenario.ball.thickness.is_none() {
+                return Err(format!(
+                    "End Condition '{SOLID}' needs a Ring ball (give the ball a thickness)"
+                ));
+            }
+            Ok(Box::new(Solid))
         }
         kind => {
             if let Some((_, instead)) = THRESHOLDS.iter().find(|(old, _)| *old == kind) {
@@ -363,5 +379,19 @@ impl EndCondition for Meltdown {
             accent: Accent::AtFire,
             finale: Finale::Meltdown,
         }
+    }
+}
+
+/// The Arena is solid: Rings have settled into it until there is no room for
+/// another (see the `settle` Rule).
+struct Solid;
+
+impl EndCondition for Solid {
+    fn id(&self) -> &'static str {
+        SOLID
+    }
+
+    fn is_met(&self, state: &SimState, _substep: u64) -> bool {
+        state.arena.solid
     }
 }

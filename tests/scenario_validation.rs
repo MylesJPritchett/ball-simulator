@@ -304,3 +304,72 @@ fn a_ring_thickness_range_must_stay_less_than_the_radius_range() {
         "{err}"
     );
 }
+
+/// A complete Scenario with a Peg `peg` in radius round a ball 200 in radius,
+/// made a Ring `thickness` thick (`None` leaves it solid).
+fn with_peg(peg: &str, thickness: Option<&str>) -> String {
+    let toml = complete()
+        .replace(
+            "radius = 460.0",
+            &format!("radius = 460.0\npeg_radius = {peg}"),
+        )
+        .replace("radius = 30.0", "radius = 200.0");
+    match thickness {
+        Some(thickness) => toml.replace(
+            "speed = 900.0",
+            &format!("speed = 900.0\nthickness = {thickness}"),
+        ),
+        None => toml,
+    }
+}
+
+#[test]
+fn a_peg_inside_a_rings_hole_is_valid() {
+    Scenario::from_toml_str("peg", &with_peg("100.0", Some("20.0"))).expect("a valid Peg");
+    Scenario::from_toml_str(
+        "peg",
+        &with_peg("{ min = 50.0, max = 150.0 }", Some("20.0")),
+    )
+    .expect("a valid range");
+}
+
+#[test]
+fn a_peg_radius_must_be_positive_and_finite() {
+    for bad in ["0.0", "-10.0", "nan", "inf"] {
+        let err = error_for(&with_peg(bad, Some("20.0")));
+        assert!(
+            err.contains("broken") && err.contains("arena.peg_radius must be greater than 0"),
+            "Peg {bad}: {err}"
+        );
+    }
+}
+
+#[test]
+fn a_peg_must_leave_room_for_the_rings_hole() {
+    // The hole's radius is 200 - 20 = 180: a Peg that big or bigger fills it.
+    for bad in ["180.0", "250.0"] {
+        let err = error_for(&with_peg(bad, Some("20.0")));
+        assert!(
+            err.contains("arena.peg_radius must be smaller than the Ring's hole"),
+            "Peg {bad}: {err}"
+        );
+    }
+    // Each end alone fits, but a Seed could draw a Peg of 175 round a hole of 170.
+    let toml = with_peg("{ min = 100.0, max = 175.0 }", Some("20.0"))
+        .replace("radius = 200.0", "radius = { min = 190.0, max = 200.0 }");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("arena.peg_radius must be smaller than the Ring's hole")
+            && err.contains("across their ranges"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_peg_needs_a_ring() {
+    let err = error_for(&with_peg("100.0", None));
+    assert!(
+        err.contains("arena.peg_radius needs a Ring ball (set ball.thickness)"),
+        "{err}"
+    );
+}

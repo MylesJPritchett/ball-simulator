@@ -48,7 +48,10 @@ pub struct BoundaryHit {
     /// Substeps completed when the hit was resolved; time = substep / SUBSTEP_HZ.
     pub substep: u64,
     pub ball_id: u32,
-    /// Angle (radians, `atan2(y, x)`, y down) of the hit point on the Boundary.
+    /// Which surface the ball touched: the Boundary or a Peg.
+    pub surface: Surface,
+    /// Angle (radians, `atan2(y, x)`, y down, from the Arena's centre) of the
+    /// hit point on that surface.
     pub angle: f64,
     /// Pitch assigned to this hit's note, in Hz.
     pub pitch: f64,
@@ -59,6 +62,16 @@ pub struct BoundaryHit {
     /// Whether this hit's note sounds (set by the `play_note` Rule). The pitch
     /// is assigned either way.
     pub plays_note: bool,
+}
+
+/// The surface a Boundary Hit landed on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Surface {
+    /// The Arena's Boundary, hit by a ball's outer edge.
+    Boundary,
+    /// The Peg at the Arena's centre, hit by a Ring's inner edge.
+    Peg,
 }
 
 impl BoundaryHit {
@@ -94,6 +107,9 @@ pub struct SimStats {
     /// Largest distance any ball's edge was outside the Boundary at the end of a
     /// substep (0 if never).
     pub max_boundary_overshoot: f64,
+    /// Largest distance any Ring's inner edge was inside the Peg at the end
+    /// of a substep (0 if never, or without a Peg).
+    pub max_peg_overshoot: f64,
     /// Highest ball speed at the end of any substep, in units per second.
     pub max_speed: f64,
 }

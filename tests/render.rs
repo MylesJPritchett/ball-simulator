@@ -719,3 +719,110 @@ fn a_ring_draws_as_an_annulus_with_the_background_in_its_hole() {
     });
     assert!(drawn);
 }
+
+/// MINIMAL round a Peg of 100: a Ring 200 in radius and 20 thick, with no
+/// trails or glows to tint anything.
+fn round_a_peg() -> String {
+    MINIMAL
+        .replace("radius = 460.0", "radius = 460.0\npeg_radius = 100.0")
+        .replace("radius = 30.0", "radius = 200.0")
+        .replace("speed = 900.0", "speed = 900.0\nthickness = 20.0")
+        + "\n[look]\ntrails = false\nglow = false\n"
+}
+
+#[test]
+fn the_peg_is_drawn_as_a_solid_disc_in_its_colour() {
+    let arena = layout::arena();
+    let scale = arena.radius / 460.0;
+    let mut frames = 0;
+    draw_frames(&round_a_peg(), 1, 60, |sim, frame| {
+        let peg = sim.palette().boundary;
+        for step in 0..36 {
+            let (sin, cos) = (step as f32 * 10.0).to_radians().sin_cos();
+            // Through the disc, up to near its edge.
+            for r in [0.0, 50.0, 95.0] {
+                let (x, y) = (
+                    arena.center_x + cos * r * scale,
+                    arena.center_y + sin * r * scale,
+                );
+                assert_eq!(pixel(frame, x, y), peg, "Peg at r {r}: {x:.0},{y:.0}");
+            }
+        }
+        frames += 1;
+    });
+    assert_eq!(frames, 60);
+}
+
+/// The colours drawn on the middle of the Boundary stroke all round, on
+/// frame 0.
+fn boundary_colours(toml: &str) -> Vec<[u8; 3]> {
+    let arena = layout::arena();
+    let r = arena.radius + BOUNDARY_WIDTH / 2.0;
+    let mut colours = Vec::new();
+    draw_frames(toml, 1, 1, |_, frame| {
+        for step in 0..360 {
+            let (sin, cos) = (step as f32).to_radians().sin_cos();
+            colours.push(pixel(
+                frame,
+                arena.center_x + cos * r,
+                arena.center_y + sin * r,
+            ));
+        }
+    });
+    colours.sort();
+    colours.dedup();
+    colours
+}
+
+#[test]
+fn with_a_peg_the_boundary_is_a_faint_target_outline() {
+    let plain = MINIMAL.to_string() + "\n[look]\ntrails = false\nglow = false\n";
+    let scenario = scenario(&plain);
+    let palette = sim::Simulation::new(&scenario, 1).palette();
+
+    assert_eq!(
+        boundary_colours(&plain),
+        vec![palette.boundary],
+        "unchanged"
+    );
+    let faint = boundary_colours(&round_a_peg());
+    assert_eq!(faint.len(), 1, "one colour all round: {faint:?}");
+    let faint = faint[0];
+    assert!(
+        brightness(faint) > brightness(palette.background) + 30
+            && brightness(faint) < brightness(palette.boundary) / 2,
+        "faint: {faint:?}, Boundary {:?}, background {:?}",
+        palette.boundary,
+        palette.background
+    );
+}
+
+#[test]
+fn a_peg_hit_glows_on_the_peg_not_the_boundary() {
+    // Every hit is on the Peg; drawn with and without glows, the frames
+    // differ only round the Peg (its 100 units plus a fading glow's reach).
+    let arena = layout::arena();
+    let scale = arena.radius / 460.0;
+    let reach = 100.0 * scale + 100.0 * 1.6 + 2.0;
+    let frames = |glow: bool| {
+        let toml = round_a_peg().replace("glow = false", &format!("glow = {glow}"));
+        let mut out = Vec::new();
+        draw_frames(&toml, 1, 60, |_, frame| out.push(frame.to_vec()));
+        out
+    };
+    let (glowing, plain) = (frames(true), frames(false));
+    let mut differing = 0;
+    for (k, (a, b)) in glowing.iter().zip(&plain).enumerate() {
+        for y in 0..layout::HEIGHT as usize {
+            for x in 0..layout::WIDTH as usize {
+                let i = (y * layout::WIDTH as usize + x) * 4;
+                if a[i..i + 3] != b[i..i + 3] {
+                    let d = (x as f32 - arena.center_x).hypot(y as f32 - arena.center_y);
+                    assert!(d < reach, "frame {k}: glow at {x},{y}, {d:.0} px out");
+                    differing += 1;
+                }
+            }
+        }
+    }
+    assert!(differing > 0, "the Peg hits glow");
+}

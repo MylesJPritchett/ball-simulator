@@ -39,6 +39,10 @@ impl Film {
 }
 
 impl Rule for Film {
+    fn lays_film(&self) -> bool {
+        true
+    }
+
     fn on_start(&mut self, state: &mut SimState, _ctx: &mut RuleContext) {
         state.film = Some(Layer::new(state.arena.radius));
     }

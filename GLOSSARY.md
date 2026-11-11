@@ -51,7 +51,7 @@ How many balls overlap at a point in the Arena, shown as colour that reaches whi
 The live number shown below the Arena (ball count, Boundary Hit count, or speed), chosen by the Scenario.
 
 **Quality Gate**:
-A headless dry run of a Seed that rejects it if the resulting Video would be dull (ends too soon, never ends, too few Boundary Hits).
+A headless dry run of a Seed that rejects it if the resulting Video would be dull (ends too soon, never ends, too few Boundary Hits, stalls hunting the last of the Film, or is won by a ball that fills the Arena).
 
 **Population Cap**:
 The maximum number of balls in a Video; splitting stops once it is reached.

@@ -119,6 +119,13 @@ pub struct QualityGateSpec {
     pub min_duration: f64,
     pub max_duration: f64,
     pub min_boundary_hits: usize,
+    /// Longest time in seconds from the Film first dropping below
+    /// [`crate::sim::quality_gate::FINAL_STRETCH_BELOW`] to it being cleared
+    /// (or to the End Condition, if it never is). `None` means no check.
+    pub max_final_stretch: Option<f64>,
+    /// Largest ball radius, as a fraction of the Arena radius, allowed when
+    /// the run ends. `None` means no check.
+    pub max_ball_radius_at_end: Option<f64>,
 }
 
 impl Default for QualityGateSpec {
@@ -127,6 +134,8 @@ impl Default for QualityGateSpec {
             min_duration: 0.0,
             max_duration: f64::INFINITY,
             min_boundary_hits: 0,
+            max_final_stretch: None,
+            max_ball_radius_at_end: None,
         }
     }
 }
@@ -272,6 +281,14 @@ impl Scenario {
             return Err(
                 self.invalid("quality_gate.min_duration must not exceed quality_gate.max_duration")
             );
+        }
+        for (key, max) in [
+            ("max_final_stretch", gate.max_final_stretch),
+            ("max_ball_radius_at_end", gate.max_ball_radius_at_end),
+        ] {
+            if max.is_some_and(|max| max.is_nan() || max <= 0.0) {
+                return Err(self.invalid(format!("quality_gate.{key} must be greater than 0")));
+            }
         }
         let films = self.rules.iter().filter(|r| r.kind == crate::rules::FILM);
         if films.count() > 1 {

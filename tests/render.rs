@@ -679,3 +679,43 @@ fn the_boundary_is_drawn_shattered_once_the_ball_breaks_out() {
     });
     assert!(checked > 60, "{checked} frames checked");
 }
+
+#[test]
+fn a_ring_draws_as_an_annulus_with_the_background_in_its_hole() {
+    // A big Ring (hole radius 120) on frame 0, before it has moved; no trails
+    // or glows to tint it.
+    let toml = MINIMAL
+        .replace("radius = 30.0", "radius = 200.0")
+        .replace("speed = 900.0", "speed = 900.0\nthickness = 80.0")
+        + "\n[look]\ntrails = false\nglow = false\n";
+    let arena = layout::arena();
+    let scale = arena.radius / 460.0;
+    let mut drawn = false;
+    draw_frames(&toml, 1, 1, |sim, frame| {
+        let ball = &sim.state().balls[0];
+        let colour = sim.palette().ball(0);
+        let background = sim.palette().background;
+        let centre = (
+            arena.center_x + ball.pos.x as f32 * scale,
+            arena.center_y + ball.pos.y as f32 * scale,
+        );
+        for step in 0..36 {
+            let (sin, cos) = (step as f32 * 10.0).to_radians().sin_cos();
+            let at = |r: f32| (centre.0 + cos * r * scale, centre.1 + sin * r * scale);
+            // Through the hole, up to near its edge.
+            for r in [0.0, 60.0, 110.0] {
+                let (x, y) = at(r);
+                assert_eq!(
+                    pixel(frame, x, y),
+                    background,
+                    "hole at r {r}: {x:.0},{y:.0}"
+                );
+            }
+            // The middle of the band.
+            let (x, y) = at(160.0);
+            assert_eq!(pixel(frame, x, y), colour, "band at {x:.0},{y:.0}");
+        }
+        drawn = true;
+    });
+    assert!(drawn);
+}

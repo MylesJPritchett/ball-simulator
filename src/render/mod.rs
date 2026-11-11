@@ -492,11 +492,21 @@ impl Renderer {
         for ball in &sim.state().balls {
             let (x, y) = self.to_screen(ball.pos.x, ball.pos.y);
             paint.shader = Shader::SolidColor(rgb(palette.ball(ball_slot(ball))));
-            if let Some(circle) = PathBuilder::from_circle(x, y, ball.radius as f32 * self.scale) {
+            // A Ring is an annulus: its hole is a second circle, left
+            // unfilled by the even-odd rule so the background shows through.
+            let mut pb = PathBuilder::new();
+            pb.push_circle(x, y, ball.radius as f32 * self.scale);
+            if let Some(thickness) = ball.thickness {
+                let hole = (ball.radius - thickness) as f32 * self.scale;
+                if hole > 0.0 {
+                    pb.push_circle(x, y, hole);
+                }
+            }
+            if let Some(path) = pb.finish() {
                 self.pixmap.fill_path(
-                    &circle,
+                    &path,
                     &paint,
-                    FillRule::Winding,
+                    FillRule::EvenOdd,
                     Transform::identity(),
                     None,
                 );

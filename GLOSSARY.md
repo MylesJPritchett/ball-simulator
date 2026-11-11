@@ -82,6 +82,10 @@ A ball passing out through an opening a Rule made in the Boundary (such as a Gap
 A ball with a hollow centre, given by its thickness: its hole's radius is its radius minus its thickness, and the thickness stays the same as the ball grows or shrinks. Its outer edge bounces off the Boundary; on its own the hole is only how it looks, so it moves exactly like a solid ball of the same radius.
 _Avoid_: Hoop, donut, hollow ball
 
+**Settle**:
+What a Ring that can no longer move does. Once it has grown to fill the Arena (which forces it concentric) it settles into the Boundary: it stops being a ball and becomes the new Boundary, a layer of the Arena in its own colour, so the Arena shrinks by the Ring's thickness and a new Ring starts at the centre. When the Arena is too small for another Ring it is **solid**, a Terminal State.
+_Avoid_: Lock in, freeze, stick
+
 **Boundary Hit**:
 A ball touching the Boundary; the default trigger for sounds and on-hit Rules. Balls pass through each other unless a Rule says otherwise.
 _Avoid_: Collision, bounce, edge hit

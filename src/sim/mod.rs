@@ -14,7 +14,7 @@ mod state;
 
 pub use ending::{Accent, Ending, EndingStyle, Finale, PlayOut};
 pub use quality_gate::{Rejection, Verdict};
-pub use record::{BallCountSample, BoundaryHit, EndEvent, SimRecord, SimStats};
+pub use record::{BallCountSample, BoundaryHit, EndEvent, Settle, SimRecord, SimStats, Surface};
 pub use state::{Arena, Ball, Crack, Gap, Shatter, SimState, Vec2};
 
 use crate::audio::music::Sound;
@@ -258,6 +258,9 @@ impl Simulation {
         self.state.remove_vanished();
         // Rules may have grown balls past the Boundary.
         self.state.contain();
+        for rule in &mut self.rules {
+            rule.on_substep_end(&mut self.state, &mut ctx);
+        }
         self.state.limit_speed(self.max_speed);
 
         self.substep = completed;
@@ -336,6 +339,7 @@ impl Simulation {
             final_state_hash: hash_state(&self.state, self.substep),
             final_arena_radius: self.state.arena.radius,
             boundary_hits: self.boundary_hits,
+            settles: self.state.settles.clone(),
             ball_count: self.ball_count,
             ending,
             end,

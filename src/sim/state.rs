@@ -5,6 +5,8 @@ use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
 use serde::Serialize;
 
+use super::record::Settle;
+
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize)]
 pub struct Vec2 {
     pub x: f64,
@@ -87,6 +89,9 @@ pub struct Arena {
     /// Set once the Boundary has shattered (see the `crack` Rule). It is then
     /// open all round, and drawn as shards flying out from where it broke.
     pub shatter: Option<Shatter>,
+    /// Set once Rings have settled into the Arena until there is no room for
+    /// another (see the `settle` Rule): what is left of it is drawn filled.
+    pub solid: bool,
 }
 
 /// An opening in the Boundary: the arc `width` radians wide centred on
@@ -124,6 +129,7 @@ impl Arena {
             gaps: Vec::new(),
             cracks: Vec::new(),
             shatter: None,
+            solid: false,
         }
     }
 
@@ -205,6 +211,8 @@ pub struct SimState {
     /// Balls that have vanished from the Arena, as they were just before,
     /// in the order they vanished.
     pub vanished: Vec<Ball>,
+    /// Rings that have settled, in order (see the `settle` Rule).
+    pub settles: Vec<Settle>,
     /// Balls marked by [`SimState::vanish`] this substep, still in `balls`.
     vanishing: Vec<u32>,
     next_ball_id: u32,
@@ -216,6 +224,7 @@ impl SimState {
             arena,
             balls: Vec::new(),
             vanished: Vec::new(),
+            settles: Vec::new(),
             vanishing: Vec::new(),
             next_ball_id: 0,
         }

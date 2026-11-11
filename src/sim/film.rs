@@ -10,6 +10,14 @@ use super::Vec2;
 /// renderer blends between cells.
 const CELLS: usize = 512;
 
+/// How far, in cells, the edge advances for each ring grown. Rings alternate
+/// between side and corner neighbours, so after `2m` rings Film has reached
+/// the octagon |x|, |y| <= 2m, |x| + |y| <= 3m (in cells), of area 14 m^2:
+/// the same area as a disc of radius 2m x sqrt(14 / 4 pi). Counting each ring
+/// as that much further keeps the edge at the right speed on average: it is
+/// about 5% slower along the grid's axes and within 1% along its diagonals.
+const RING: f64 = 1.055_531;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Film {
     /// Radius of the Arena the Film was laid over.
@@ -113,12 +121,13 @@ impl Film {
     }
 
     /// Grows the Film back by `distance`: its edge advances that far into
-    /// the cleared Arena, a ring of cells for each cell's width, spreading
+    /// the cleared Arena, a ring of cells at a time, spreading
     /// only from the Film that is left. Once no Film is left nothing grows.
     pub fn regrow(&mut self, distance: f64) {
         self.owed += distance;
-        while self.owed >= self.cell {
-            self.owed -= self.cell;
+        let ring = RING * self.cell;
+        while self.owed >= ring {
+            self.owed -= ring;
             self.grow_ring();
         }
     }
@@ -187,7 +196,7 @@ impl Film {
         offsets.iter().filter_map(move |&(dc, dr)| {
             let (c, r) = (col + dc, row + dr);
             let on_grid = (0..CELLS as isize).contains(&c) && (0..CELLS as isize).contains(&r);
-            on_grid.then_some(r as usize * CELLS + c as usize)
+            on_grid.then(|| r as usize * CELLS + c as usize)
         })
     }
 

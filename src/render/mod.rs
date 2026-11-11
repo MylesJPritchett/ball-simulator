@@ -6,7 +6,7 @@
 //! window) gets identical frames, the Ending's flash and Finale included.
 //!
 //! Draw order: background, fading trails, Boundary (with its cracks), hit
-//! glows, balls, the Ending's Finale (e.g. a pop), Hook Title, Counter, then
+//! glows, settled layers, balls, the Ending's Finale (e.g. a pop), Hook Title, Counter, then
 //! the Ending's flash over everything; a Meltdown breaks the finished frame
 //! down last. Trails and glows are clipped to the Arena (Boundary included).
 //! With Heat on, the Heat field takes the place of trails and balls.
@@ -25,7 +25,7 @@ use crate::layout;
 use crate::look::palette::{Palette, Rgb};
 use crate::look::{Counter, LookSpec};
 use crate::scenario::Scenario;
-use crate::sim::{Ball, Ending, Finale, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
+use crate::sim::{Ball, Ending, Finale, Simulation, Surface, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
 use heat::Heat;
 use meltdown::Meltdown;
 use text::{FittedText, TextPainter};
@@ -214,6 +214,7 @@ impl Renderer {
         if self.glow {
             self.draw_glows(sim, palette, now);
         }
+        self.draw_layers(sim, palette);
         if self.heat.is_none() {
             self.draw_balls(sim, palette);
         }
@@ -326,11 +327,25 @@ impl Renderer {
         sim.state().arena.radius as f32 * self.scale
     }
 
+    /// Where the Boundary is drawn (px): on the Arena's edge, or round the
+    /// outermost settled layer once Rings have settled into it, so it does
+    /// not move when one does.
+    fn boundary_stroke_radius(&self, sim: &Simulation) -> f32 {
+        let state = sim.state();
+        let outer = state
+            .settles
+            .iter()
+            .filter(|settle| settle.surface == Surface::Boundary)
+            .map(|settle| settle.radius)
+            .fold(state.arena.radius, f64::max);
+        outer as f32 * self.scale
+    }
+
     /// The Boundary, with any Gaps left out, and its cracks; once it has
     /// shattered, its shards (cracks and all) flying outward.
     fn draw_boundary(&mut self, sim: &Simulation, palette: &Palette) {
         let centre = (self.arena.center_x, self.arena.center_y);
-        let inner = self.boundary_radius(sim);
+        let inner = self.boundary_stroke_radius(sim);
         let r = inner + BOUNDARY_WIDTH / 2.0;
         let arena = &sim.state().arena;
         let shards = arena.shatter.map(|shatter| {
@@ -479,6 +494,48 @@ impl Renderer {
                     FillRule::Winding,
                     Transform::identity(),
                     clip,
+                );
+            }
+        }
+    }
+
+    /// Each settled Ring as a concentric annulus in its colour, where it was
+    /// as it settled, so nothing moves when one settles. Once the Arena is
+    /// solid, what is left of it is filled in the last layer's colour.
+    fn draw_layers(&mut self, sim: &Simulation, palette: &Palette) {
+        let state = sim.state();
+        let (x, y) = self.to_screen(0.0, 0.0);
+        let mut paint = Paint {
+            anti_alias: true,
+            ..Paint::default()
+        };
+        for settle in &state.settles {
+            paint.set_color(rgb(palette.ball(settle.colour as usize)));
+            let mut pb = PathBuilder::new();
+            pb.push_circle(x, y, settle.radius as f32 * self.scale);
+            let hole = (settle.radius - settle.thickness) as f32 * self.scale;
+            if hole > 0.0 {
+                pb.push_circle(x, y, hole);
+            }
+            if let Some(path) = pb.finish() {
+                self.pixmap.fill_path(
+                    &path,
+                    &paint,
+                    FillRule::EvenOdd,
+                    Transform::identity(),
+                    None,
+                );
+            }
+        }
+        if let (true, Some(last)) = (state.arena.solid, state.settles.last()) {
+            paint.set_color(rgb(palette.ball(last.colour as usize)));
+            if let Some(centre) = PathBuilder::from_circle(x, y, self.boundary_radius(sim)) {
+                self.pixmap.fill_path(
+                    &centre,
+                    &paint,
+                    FillRule::Winding,
+                    Transform::identity(),
+                    None,
                 );
             }
         }

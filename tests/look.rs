@@ -132,6 +132,33 @@ fn trails_and_glow_are_on_by_default_and_can_be_switched_off() {
     assert!(!off.trails && !off.glow);
 }
 
+/// WCAG contrast ratio between two sRGB colours (1 to 21).
+fn contrast(a: [u8; 3], b: [u8; 3]) -> f64 {
+    let luminance = |c: [u8; 3]| {
+        let lin = |v: u8| {
+            let v = v as f64 / 255.0;
+            if v <= 0.04045 {
+                v / 12.92
+            } else {
+                ((v + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2])
+    };
+    let (la, lb) = (luminance(a), luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
+#[test]
+fn the_film_stands_out_from_the_cleared_arena_in_every_palette() {
+    // The cleared Arena is the background. 2.5:1 is well clear of the dark
+    // backgrounds while leaving the balls room to stand out from the Film.
+    for p in palette::PALETTES {
+        let ratio = contrast(p.film, p.background);
+        assert!(ratio >= 2.5, "{}: Film contrast {ratio:.2}", p.name);
+    }
+}
+
 #[test]
 fn unknown_counter_is_rejected() {
     let err = Scenario::from_toml_str("broken", &with_look("counter = \"vibes\""))

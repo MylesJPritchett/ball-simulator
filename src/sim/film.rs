@@ -64,9 +64,8 @@ impl Film {
     /// cells in the capsule's bounding box are looked at.
     pub fn wipe(&mut self, from: Vec2, to: Vec2, radius: f64) {
         let lo = |v: f64| ((v - radius + self.radius) / self.cell).floor().max(0.0) as usize;
-        let hi = |v: f64| {
-            (((v + radius + self.radius) / self.cell).ceil().max(0.0) as usize).min(CELLS)
-        };
+        let hi =
+            |v: f64| (((v + radius + self.radius) / self.cell).ceil().max(0.0) as usize).min(CELLS);
         let (col0, col1) = (lo(from.x.min(to.x)), hi(from.x.max(to.x)));
         let (row0, row1) = (lo(from.y.min(to.y)), hi(from.y.max(to.y)));
         let path = to - from;
@@ -92,6 +91,26 @@ impl Film {
                 }
             }
         }
+    }
+
+    /// How much Film there is at `p`, from 0 to 1, blended between the
+    /// nearest cells so the Film's edge is smooth rather than a staircase.
+    pub fn coverage_at(&self, p: Vec2) -> f64 {
+        let gx = (p.x + self.radius) / self.cell - 0.5;
+        let gy = (p.y + self.radius) / self.cell - 0.5;
+        let (col, row) = (gx.floor(), gy.floor());
+        let (fx, fy) = (gx - col, gy - row);
+        let has = |c: f64, r: f64| {
+            let inside = (0.0..CELLS as f64).contains(&c) && (0.0..CELLS as f64).contains(&r);
+            if inside && self.cells[r as usize * CELLS + c as usize] {
+                1.0
+            } else {
+                0.0
+            }
+        };
+        let top = has(col, row) * (1.0 - fx) + has(col + 1.0, row) * fx;
+        let bottom = has(col, row + 1.0) * (1.0 - fx) + has(col + 1.0, row + 1.0) * fx;
+        top * (1.0 - fy) + bottom * fy
     }
 
     /// The centre of the cell at `col`, `row`.

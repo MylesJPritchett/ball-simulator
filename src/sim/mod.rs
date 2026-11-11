@@ -14,8 +14,8 @@ pub mod rng;
 mod state;
 
 pub use ending::{Accent, Ending, EndingStyle, Finale, PlayOut};
-pub use quality_gate::{Rejection, Verdict};
 pub use film::Film;
+pub use quality_gate::{Rejection, Verdict};
 pub use record::{BallCountSample, BoundaryHit, EndEvent, FilmLeftSample, SimRecord, SimStats};
 pub use state::{Arena, Ball, Crack, Gap, Shatter, SimState, Vec2};
 

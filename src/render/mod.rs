@@ -5,7 +5,7 @@
 //! anything that drives a `Simulation` frame by frame (the encoder, a preview
 //! window) gets identical frames, the Ending's flash and Finale included.
 //!
-//! Draw order: background, fading trails, Boundary (with its cracks), hit
+//! Draw order: background, the Film, fading trails, Boundary (with its cracks), hit
 //! glows, balls, the Ending's Finale (e.g. a pop), Hook Title, Counter, then
 //! the Ending's flash over everything; a Meltdown breaks the finished frame
 //! down last. Trails and glows are clipped to the Arena (Boundary included).
@@ -25,7 +25,7 @@ use crate::layout;
 use crate::look::palette::{Palette, Rgb};
 use crate::look::{Counter, LookSpec};
 use crate::scenario::Scenario;
-use crate::sim::{Ball, Ending, Finale, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
+use crate::sim::{Ball, Ending, Finale, Simulation, Vec2, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
 use heat::Heat;
 use meltdown::Meltdown;
 use text::{FittedText, TextPainter};
@@ -205,6 +205,7 @@ impl Renderer {
         self.pixmap.fill(rgb(palette.background));
         self.update_clip(sim);
 
+        self.draw_film(sim, palette);
         if self.heat.is_some() {
             self.draw_heat(sim, palette);
         } else if self.trails.is_some() {
@@ -309,6 +310,36 @@ impl Renderer {
             Transform::identity(),
             clip,
         );
+    }
+
+    /// The Film, if there is one, over the background: each pixel in the
+    /// Arena's box blends towards the Film colour by how much Film is there.
+    fn draw_film(&mut self, sim: &Simulation, palette: &Palette) {
+        let Some(film) = &sim.state().film else {
+            return;
+        };
+        let (width, height) = (layout::WIDTH as usize, layout::HEIGHT as usize);
+        let a = &self.arena;
+        let span = |centre: f32, max: usize| {
+            let lo = (centre - a.radius).floor().max(0.0) as usize;
+            (lo, ((centre + a.radius).ceil() as usize).min(max))
+        };
+        let ((x0, x1), (y0, y1)) = (span(a.center_x, width), span(a.center_y, height));
+        let data = self.pixmap.data_mut();
+        for y in y0..y1 {
+            let sy = (y as f32 + 0.5 - a.center_y) / self.scale;
+            for x in x0..x1 {
+                let sx = (x as f32 + 0.5 - a.center_x) / self.scale;
+                let coverage = film.coverage_at(Vec2::new(sx as f64, sy as f64));
+                if coverage <= 0.0 {
+                    continue;
+                }
+                let [r, g, b] = mix(palette.background, palette.film, coverage as f32);
+                let i = (y * width + x) * 4;
+                // Opaque, so premultiplied equals straight RGB.
+                data[i..i + 4].copy_from_slice(&[r, g, b, 255]);
+            }
+        }
     }
 
     fn draw_heat(&mut self, sim: &Simulation, palette: &Palette) {

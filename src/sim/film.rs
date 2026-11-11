@@ -23,6 +23,20 @@ pub struct Film {
     total: usize,
     /// Cells that still have Film.
     left: usize,
+    /// Cleared cells that may border Film, in the order they were found:
+    /// regrowth only looks at these, so its cost follows the Film's edge
+    /// rather than the whole grid. Cells that turn out to border no Film are
+    /// dropped and come back when a neighbour grows.
+    frontier: Vec<usize>,
+    /// Whether each cell is in `frontier`.
+    queued: Vec<bool>,
+    /// How far the edge is owed to advance, in simulation units, short of a
+    /// whole cell.
+    owed: f64,
+    /// Rings grown so far; rings alternate between growing into the four
+    /// side neighbours and all eight, so the edge advances at nearly the same
+    /// speed in every direction rather than as a diamond or a square.
+    rings: u64,
 }
 
 impl Film {
@@ -35,6 +49,10 @@ impl Film {
             cells: vec![false; CELLS * CELLS],
             total: 0,
             left: 0,
+            frontier: Vec::new(),
+            queued: vec![false; CELLS * CELLS],
+            owed: 0.0,
+            rings: 0,
         };
         for row in 0..CELLS {
             for col in 0..CELLS {
@@ -88,9 +106,94 @@ impl Film {
                 if gap.dot(gap) <= radius2 {
                     self.cells[index] = false;
                     self.left -= 1;
+                    self.queue(index);
                 }
             }
         }
+    }
+
+    /// Grows the Film back by `distance`: its edge advances that far into
+    /// the cleared Arena, a ring of cells for each cell's width, spreading
+    /// only from the Film that is left. Once no Film is left nothing grows.
+    pub fn regrow(&mut self, distance: f64) {
+        self.owed += distance;
+        while self.owed >= self.cell {
+            self.owed -= self.cell;
+            self.grow_ring();
+        }
+    }
+
+    /// Grows Film into every cleared cell that borders Film: by a side on
+    /// even rings, by a side or a corner on odd ones.
+    fn grow_ring(&mut self) {
+        let corners = self.rings % 2 == 1;
+        self.rings += 1;
+        let mut grows = Vec::new();
+        let mut kept = Vec::new();
+        for index in std::mem::take(&mut self.frontier) {
+            if self.borders_film(index, corners) {
+                grows.push(index);
+            } else if self.borders_film(index, true) {
+                kept.push(index);
+            } else {
+                self.queued[index] = false;
+            }
+        }
+        self.frontier = kept;
+        for &index in &grows {
+            self.queued[index] = false;
+            self.cells[index] = true;
+            self.left += 1;
+        }
+        for &index in &grows {
+            for next in self.neighbours(index, true) {
+                if !self.cells[next] && self.is_inside(next) {
+                    self.queue(next);
+                }
+            }
+        }
+    }
+
+    /// Adds a cleared cell to the frontier, once.
+    fn queue(&mut self, index: usize) {
+        if !self.queued[index] {
+            self.queued[index] = true;
+            self.frontier.push(index);
+        }
+    }
+
+    /// Whether a side neighbour of the cell (or, with `corners`, any of its
+    /// eight neighbours) has Film.
+    fn borders_film(&self, index: usize, corners: bool) -> bool {
+        self.neighbours(index, corners).any(|next| self.cells[next])
+    }
+
+    /// The cells around `index` on the grid: its four side neighbours, and
+    /// with `corners` its four corner neighbours too.
+    fn neighbours(&self, index: usize, corners: bool) -> impl Iterator<Item = usize> {
+        const SIDES: [(isize, isize); 4] = [(0, -1), (-1, 0), (1, 0), (0, 1)];
+        const ALL: [(isize, isize); 8] = [
+            (-1, -1),
+            (0, -1),
+            (1, -1),
+            (-1, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1),
+        ];
+        let offsets: &'static [(isize, isize)] = if corners { &ALL } else { &SIDES };
+        let (col, row) = ((index % CELLS) as isize, (index / CELLS) as isize);
+        offsets.iter().filter_map(move |&(dc, dr)| {
+            let (c, r) = (col + dc, row + dr);
+            let on_grid = (0..CELLS as isize).contains(&c) && (0..CELLS as isize).contains(&r);
+            on_grid.then_some(r as usize * CELLS + c as usize)
+        })
+    }
+
+    /// Whether the cell's centre is inside the Arena.
+    fn is_inside(&self, index: usize) -> bool {
+        self.centre(index % CELLS, index / CELLS).length() <= self.radius
     }
 
     /// How much Film there is at `p`, from 0 to 1, blended between the

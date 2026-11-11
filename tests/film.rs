@@ -111,3 +111,23 @@ fn the_same_seed_wipes_the_same_film() {
     let toml = format!("{MINIMAL}{FILM}");
     assert_eq!(run(&toml, 4), run(&toml, 4));
 }
+
+/// A `film` Rule whose edge grows back at `regrow` units per second.
+fn regrowing(regrow: f64) -> String {
+    FILM.replace("0.0", &format!("{regrow:?}"))
+}
+
+#[test]
+fn wiped_film_grows_back_with_regrowth() {
+    // The edge grows back faster than the slow ball wipes its band.
+    let toml = straight_pass(30.0, 100.0, 2.0).replace(FILM, &regrowing(200.0));
+    let record = run(&toml, 3);
+
+    assert!(
+        record
+            .film_left
+            .windows(2)
+            .any(|pair| pair[1].left > pair[0].left),
+        "Film left never went up"
+    );
+}

@@ -5,8 +5,12 @@
 //! ```toml
 //! [[rules]]
 //! kind = "film"
-//! regrow = 0.0     # how fast the Film grows back (>= 0; 0 = never)
+//! regrow = 0.0     # how fast the Film's edge grows back, units/s (>= 0; 0 = never)
 //! ```
+//!
+//! Cleared Film grows back only from the Film that is left: its edge advances
+//! about `regrow` Arena units a second into the cleared area, so a ball's
+//! path closes up behind it. Once no Film is left, nothing grows back.
 //!
 //! A Scenario has at most one `film` Rule.
 
@@ -22,19 +26,28 @@ struct Params {
     regrow: f64,
 }
 
-pub struct Film;
+pub struct Film {
+    regrow: f64,
+}
 
 impl Film {
     pub fn from_spec(spec: &RuleSpec) -> Result<Self, String> {
         let p: Params = params(spec)?;
-        // Checked now so Scenarios can set it; the Film does not grow back yet.
-        non_negative_finite(spec, "regrow", p.regrow)?;
-        Ok(Film)
+        let regrow = non_negative_finite(spec, "regrow", p.regrow)?;
+        Ok(Film { regrow })
     }
 }
 
 impl Rule for Film {
     fn on_start(&mut self, state: &mut SimState, _ctx: &mut RuleContext) {
         state.film = Some(Layer::new(state.arena.radius));
+    }
+
+    fn on_substep(&mut self, state: &mut SimState, ctx: &mut RuleContext) {
+        if self.regrow > 0.0 {
+            if let Some(film) = &mut state.film {
+                film.regrow(self.regrow * ctx.dt);
+            }
+        }
     }
 }

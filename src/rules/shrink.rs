@@ -1,6 +1,7 @@
 //! Shrink: a ball's radius decreases by `amount` on each Boundary Hit. The
 //! hit that would take it to zero or below makes the ball vanish instead
-//! (pair with the `vanished` End Condition).
+//! (pair with the `vanished` End Condition), except for a Ring round a Peg,
+//! whose hole stops at the Peg.
 //!
 //! ```toml
 //! [[rules]]
@@ -41,8 +42,11 @@ impl Rule for Shrink {
         _hit: &mut BoundaryHit,
         _ctx: &mut RuleContext,
     ) {
+        // A Ring round a Peg never vanishes: its hole stops at the Peg (the
+        // simulation clamps an overshoot to the exact fit) and it settles.
+        let round_peg = state.arena.peg_radius.is_some();
         let ball = &mut state.balls[index];
-        if ball.radius - self.amount > 0.0 {
+        if ball.radius - self.amount > 0.0 || round_peg && ball.thickness.is_some() {
             ball.radius -= self.amount;
         } else {
             state.vanish(index);

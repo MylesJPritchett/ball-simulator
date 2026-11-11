@@ -924,3 +924,85 @@ fn a_solid_arena_is_filled_to_the_centre_and_the_flash_covers_the_whole_disc() {
         }
     }
 }
+
+/// A Ring (radius 450, thickness 50) round a Peg of 100 that shrinks by 200
+/// on every Boundary Hit and settles onto the Peg: it grows to 150, 200, ...,
+/// 450, where one more thickness reaches the 460 Boundary, so the Arena is
+/// solid after seven layers. It changes colour on every hit, so neighbouring
+/// layers differ.
+fn settling_onto_a_peg() -> String {
+    MINIMAL
+        .replace("time_cap = 5.0", "time_cap = 60.0")
+        .replace("radius = 460.0", "radius = 460.0\npeg_radius = 100.0")
+        .replace("radius = 30.0", "radius = 450.0")
+        .replace("speed = 900.0", "speed = 3000.0\nthickness = 50.0")
+        + "\n[[rules]]\nkind = \"shrink\"\namount = 200.0\n\
+           \n[[rules]]\nkind = \"change_colour\"\n\
+           \n[[rules]]\nkind = \"settle\"\n\
+           \n[look]\ntrails = false\nglow = false\n\
+           \n[end_condition]\nkind = \"solid\"\n"
+}
+
+#[test]
+fn the_peg_is_drawn_as_its_settled_layers_on_its_starting_colour() {
+    let toml = settling_onto_a_peg();
+    let record = sim::run(&scenario(&toml), 1);
+    assert_eq!(record.settles.len(), 7);
+    let no_flash = |ending: Ending| Ending {
+        flash_substeps: 0,
+        ..ending
+    };
+    let mut checked = 0;
+    draw_frames_with(&toml, 1, record.ending.frames(), no_flash, |sim, frame| {
+        let palette = sim.palette();
+        for step in 0..36 {
+            let degrees = step as f32 * 10.0;
+            for r in [0.0, 50.0, 95.0] {
+                assert_eq!(
+                    at_radius(frame, r, degrees),
+                    palette.boundary,
+                    "the Peg as it started at r {r}"
+                );
+            }
+            for settle in &sim.state().settles {
+                assert_eq!(
+                    at_radius(frame, settle.radius - settle.thickness / 2.0, degrees),
+                    palette.ball(settle.colour as usize),
+                    "layer out to {} in its colour",
+                    settle.radius
+                );
+            }
+        }
+        checked += sim.state().settles.len();
+    });
+    assert!(checked > 7, "{checked} layers checked");
+}
+
+#[test]
+fn at_the_ending_the_peg_fills_the_outline_and_the_flash_covers_it() {
+    let toml = settling_onto_a_peg();
+    let record = sim::run(&scenario(&toml), 1);
+    let fired = (record.end.substep / SUBSTEPS_PER_FRAME + 1) as usize;
+    let mut frames = Vec::new();
+    let mut last_layer = None;
+    draw_frames(&toml, 1, record.ending.frames(), |sim, frame| {
+        frames.push(frame.to_vec());
+        let last = sim.state().settles.last().map(|s| s.colour as usize);
+        last_layer = Some(sim.palette().ball(last.unwrap_or(0)));
+    });
+    let last_layer = last_layer.unwrap();
+    let held = frames.last().unwrap();
+    let flashed = &frames[fired];
+    let bright = |c: [u8; 3]| c.map(u32::from).iter().sum::<u32>();
+    for step in 0..12 {
+        let degrees = step as f32 * 30.0;
+        // Between the last layer (out to 450) and the 460 outline.
+        assert_eq!(at_radius(held, 455.0, degrees), last_layer, "filled");
+        for r in (0..46).map(|k| k as f64 * 10.0).chain([455.0]) {
+            assert!(
+                bright(at_radius(flashed, r, degrees)) > bright(at_radius(held, r, degrees)),
+                "the flash covers r {r} at {degrees}"
+            );
+        }
+    }
+}

@@ -44,6 +44,15 @@ pub struct Voice {
     pub gain: f64,
 }
 
+/// A note to play, before the Voice cap: `len` samples of `pitch` at `gain`
+/// from sample `start`.
+struct Note {
+    start: usize,
+    len: usize,
+    pitch: f64,
+    gain: f64,
+}
+
 /// Total soundtrack length in samples: the Video's duration, ending included.
 fn total_samples(record: &SimRecord) -> usize {
     (record.ending.duration() * SAMPLE_RATE as f64).round() as usize
@@ -76,7 +85,13 @@ pub fn voices(record: &SimRecord) -> Vec<Voice> {
     let mut out: Vec<Voice> = Vec::new();
     // Indices into `out` of Voices that may still be sounding, oldest first.
     let mut sounding: Vec<usize> = Vec::new();
-    let mut play = |out: &mut Vec<Voice>, start: usize, len: usize, pitch: f64, gain: f64| {
+    let mut play = |out: &mut Vec<Voice>, note: Note| {
+        let Note {
+            start,
+            len,
+            pitch,
+            gain,
+        } = note;
         if start >= total {
             return;
         }
@@ -97,12 +112,14 @@ pub fn voices(record: &SimRecord) -> Vec<Voice> {
         });
     };
 
-    // (start sample, length, pitch, gain) of every note, chords included.
-    let mut scheduled: Vec<(usize, usize, f64, f64)> = notes
+    // Every note, chords included.
+    let mut scheduled: Vec<Note> = notes
         .iter()
-        .map(|&(start, pitch, count)| {
-            let gain = HIT_GAIN * (1.0 + 0.25 * (count as f64).ln());
-            (start, note_len, pitch, gain)
+        .map(|&(start, pitch, count)| Note {
+            start,
+            len: note_len,
+            pitch,
+            gain: HIT_GAIN * (1.0 + 0.25 * (count as f64).ln()),
         })
         .collect();
 
@@ -111,7 +128,12 @@ pub fn voices(record: &SimRecord) -> Vec<Voice> {
     let mut chord = |substep: u64, gain: f64| {
         let start = (substep * SAMPLES_PER_SUBSTEP) as usize;
         for &semis in sound.scale.chord() {
-            scheduled.push((start, chord_len, sound.hz(semis), gain));
+            scheduled.push(Note {
+                start,
+                len: chord_len,
+                pitch: sound.hz(semis),
+                gain,
+            });
         }
     };
     // The full chord sounds at the Ending's accent: when the End Condition
@@ -130,9 +152,9 @@ pub fn voices(record: &SimRecord) -> Vec<Voice> {
     }
 
     // In time order, so the Voice cap steals the right notes.
-    scheduled.sort_by_key(|n| n.0);
-    for (start, len, pitch, gain) in scheduled {
-        play(&mut out, start, len, pitch, gain);
+    scheduled.sort_by_key(|note| note.start);
+    for note in scheduled {
+        play(&mut out, note);
     }
 
     // Notes stolen the instant they started never sound.

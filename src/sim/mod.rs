@@ -14,7 +14,9 @@ mod state;
 
 pub use ending::{Accent, Ending, EndingStyle, Finale, PlayOut};
 pub use quality_gate::{Rejection, Verdict};
-pub use record::{BallCountSample, BoundaryHit, EndEvent, Settle, SimRecord, SimStats, Surface};
+pub use record::{
+    BallCountSample, BoundaryHit, EndEvent, SettleEvent, SimRecord, SimStats, Surface,
+};
 pub use state::{Arena, Ball, Crack, Gap, Shatter, SimState, Vec2};
 
 use crate::audio::music::Sound;
@@ -289,9 +291,8 @@ impl Simulation {
             if overshoot > self.stats.max_boundary_overshoot {
                 self.stats.max_boundary_overshoot = overshoot;
             }
-            if let (Some(peg), Some(thickness)) = (arena.peg_radius, ball.thickness) {
-                let hole = ball.radius - thickness;
-                let overshoot = ball.pos.length() + peg - hole;
+            if let Some(room) = arena.peg_room(ball.radius, ball.thickness) {
+                let overshoot = ball.pos.length() - room;
                 self.stats.max_peg_overshoot = self.stats.max_peg_overshoot.max(overshoot);
             }
         }
@@ -389,14 +390,12 @@ fn resolve_boundary(ball: &mut Ball, arena: &Arena, closing_speed: f64) -> Optio
     if ball.escaping {
         return None;
     }
-    let boundary_limit = arena.radius - ball.radius;
-    let peg_limit = match (arena.peg_radius, ball.thickness) {
-        (Some(peg), Some(thickness)) => Some((ball.radius - thickness - peg).max(0.0)),
-        _ => None,
-    };
-    let (surface, limit, closing_speed) = match peg_limit {
-        Some(peg_limit) if peg_limit < boundary_limit => (Surface::Peg, peg_limit, 0.0),
-        _ => (Surface::Boundary, boundary_limit, closing_speed),
+    let limit = arena.room(ball.radius, ball.thickness);
+    // The room is the Boundary's unless the Peg leaves less.
+    let (surface, closing_speed) = if limit < arena.radius - ball.radius {
+        (Surface::Peg, 0.0)
+    } else {
+        (Surface::Boundary, closing_speed)
     };
     let dist = ball.pos.length();
     if dist < limit || dist == 0.0 {
@@ -453,6 +452,21 @@ fn hash_state(state: &SimState, substep: u64) -> u64 {
         feed(b.vel.x.to_bits());
         feed(b.vel.y.to_bits());
         feed(b.radius.to_bits());
+        // Only for Rings, so hashes without them are unchanged.
+        if let Some(thickness) = b.thickness {
+            feed(thickness.to_bits());
+        }
+    }
+    // Only once a Ring has settled, likewise.
+    if !state.settles.is_empty() {
+        feed(state.settles.len() as u64);
+        for settle in &state.settles {
+            feed(settle.substep);
+            feed(settle.colour as u64);
+            feed(settle.surface as u64);
+            feed(settle.radius.to_bits());
+            feed(settle.thickness.to_bits());
+        }
     }
     h
 }

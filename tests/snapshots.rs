@@ -179,7 +179,7 @@ fn growing_rings_seed_1() {
             final_ball_count: 0,
             end_condition: "solid",
             end_substep: 16883,
-            final_state_hash: 9189708188696506814,
+            final_state_hash: 14733856739632147521,
         },
     );
 }
@@ -221,7 +221,7 @@ fn shrinking_rings_seed_1() {
             final_ball_count: 0,
             end_condition: "solid",
             end_substep: 15319,
-            final_state_hash: 6883116001059761684,
+            final_state_hash: 18347527339010434954,
         },
     );
 }

@@ -4,7 +4,7 @@
 # starts at full size, until the Peg fills the faint outline of the Arena as a
 # solid disc of concentric layers.
 
-name = "Shrinking rings"
+name = "Shrinking Rings"
 hook_title = "Every bounce it shrinks"
 # Safety net only: a Ring stuck skimming without settling is rejected.
 time_cap = 60.0

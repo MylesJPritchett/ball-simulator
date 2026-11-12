@@ -3,7 +3,8 @@
 //! The End Condition chooses its Ending's shape ([`EndingStyle`]): an optional
 //! Play-out in which the simulation keeps going and the Terminal State finishes
 //! on screen, whether a flash plays and the final chord sounds and when
-//! ([`Accent`]), and the [`Finale`] the renderer draws over the Play-out.
+//! ([`Accent`]), and the [`Finale`] the renderer draws over the Play-out or
+//! the hold.
 //! After the Play-out the action freezes and the frozen frame holds for [`HOLD_SECONDS`] before the Video
 //! cuts. Everything downstream reads the timing from [`Ending`] (via
 //! `SimRecord::ending`, built only by `Simulation::ending`) so render, audio
@@ -35,7 +36,7 @@ pub struct EndingStyle {
     pub final_chord: bool,
     /// When the flash and the final chord start.
     pub accent: Accent,
-    /// What the renderer draws over the Play-out.
+    /// What the renderer draws over the Play-out or the hold.
     pub finale: Finale,
 }
 
@@ -87,8 +88,9 @@ impl PlayOut {
     }
 }
 
-/// The Ending's Finale: the flourish the renderer draws over the Play-out,
-/// timed by [`Ending::play_out_at`].
+/// The Ending's Finale: the flourish the renderer draws over the Play-out
+/// (timed by [`Ending::play_out_at`]) or over the hold (timed by
+/// [`Ending::hold_at`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Finale {
@@ -98,6 +100,9 @@ pub enum Finale {
     /// The Video appears to break down: frames stutter, tear and split into
     /// colour channels, then cut to a frozen broken frame for the hold.
     Meltdown,
+    /// A bright band sweeps once across the frozen Arena during the hold,
+    /// timed by [`Ending::hold_at`].
+    Shimmer,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -116,7 +121,7 @@ pub struct Ending {
     pub cut_substep: u64,
     /// Whether the final chord sounds at `accent_substep`.
     pub final_chord: bool,
-    /// What the renderer draws over the Play-out.
+    /// What the renderer draws over the Play-out or the hold.
     pub finale: Finale,
 }
 
@@ -178,6 +183,17 @@ impl Ending {
             .then(|| {
                 (substep - self.start_substep) as f32
                     / (self.freeze_substep - self.start_substep) as f32
+            })
+    }
+
+    /// How far through the hold a moment is (0 at the freeze, approaching 1
+    /// at the cut), or `None` outside the hold.
+    pub fn hold_at(&self, substep: u64) -> Option<f32> {
+        (self.freeze_substep..self.cut_substep)
+            .contains(&substep)
+            .then(|| {
+                (substep - self.freeze_substep) as f32
+                    / (self.cut_substep - self.freeze_substep) as f32
             })
     }
 }

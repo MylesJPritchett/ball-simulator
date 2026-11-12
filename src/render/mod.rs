@@ -6,9 +6,10 @@
 //! window) gets identical frames, the Ending's flash and Finale included.
 //!
 //! Draw order: background, the Film, fading trails, Boundary (with its cracks), hit
-//! glows, balls, the Ending's Finale (e.g. a pop), Hook Title, Counter, then
-//! the Ending's flash over everything; a Meltdown breaks the finished frame
-//! down last. Trails and glows are clipped to the Arena (Boundary included).
+//! glows, balls, the Ending's Finale (e.g. a pop, or a shimmer over the hold),
+//! Hook Title, Counter, then the Ending's flash over everything; a Meltdown
+//! breaks the finished frame down last. Trails, glows and the shimmer are
+//! clipped to the Arena (Boundary included).
 //! With Heat on, the Heat field takes the place of trails and balls.
 
 mod heat;
@@ -17,8 +18,8 @@ mod shatter;
 pub mod text;
 
 use tiny_skia::{
-    Color, FillRule, GradientStop, LineCap, LineJoin, Mask, Paint, PathBuilder, Pixmap,
-    PixmapPaint, Point, RadialGradient, Rect, Shader, SpreadMode, Stroke, Transform,
+    Color, FillRule, GradientStop, LineCap, LineJoin, LinearGradient, Mask, Paint, PathBuilder,
+    Pixmap, PixmapPaint, Point, RadialGradient, Rect, Shader, SpreadMode, Stroke, Transform,
 };
 
 use crate::layout;
@@ -37,6 +38,17 @@ const BOUNDARY_ARC_STEP: f64 = std::f64::consts::PI / 360.0;
 /// Ending flash colour and its opacity at full strength.
 const FLASH: [u8; 3] = [255, 255, 255];
 const FLASH_MAX_ALPHA: f32 = 0.75;
+
+/// Shimmer colour, its opacity at the middle of the band, and the band's
+/// half-width (px).
+const SHIMMER: [u8; 3] = [255, 255, 255];
+const SHIMMER_MAX_ALPHA: f32 = 0.6;
+const SHIMMER_HALF_WIDTH: f32 = 90.0;
+/// The direction the shimmer sweeps in (on screen; it leans the band).
+const SHIMMER_DIRECTION: (f32, f32) = (0.94, 0.34);
+/// Fraction of the hold the shimmer takes to cross the Arena; the rest of
+/// the hold is still.
+const SHIMMER_SWEEP: f32 = 0.75;
 
 /// How far (px) a pop's ring expands beyond the vanished ball's edge.
 const POP_GROWTH: f32 = 160.0;
@@ -221,6 +233,12 @@ impl Renderer {
         let play_out = ending.and_then(|e| Some((e.finale, e.play_out_at(now)?)));
         if let Some((Finale::Pop, t)) = play_out {
             self.draw_pops(sim, palette, t);
+        }
+        if let Some(t) = ending
+            .filter(|e| e.finale == Finale::Shimmer)
+            .and_then(|e| e.hold_at(now))
+        {
+            self.draw_shimmer(sim, t);
         }
         self.draw_text(sim, palette);
         if let Some(ending) = ending {
@@ -558,6 +576,46 @@ impl Renderer {
                     .stroke_path(&circle, &paint, &stroke, Transform::identity(), None);
             }
         }
+    }
+
+    /// Sweeps a bright band once across the Arena (`t` 0..1 through the
+    /// hold, from [`Ending::hold_at`]): it enters from one side, crosses and
+    /// has left by [`SHIMMER_SWEEP`] of the way through.
+    fn draw_shimmer(&mut self, sim: &Simulation, t: f32) {
+        let s = (t / SHIMMER_SWEEP).min(1.0);
+        let eased = s * s * (3.0 - 2.0 * s);
+        let reach = self.boundary_radius(sim) + BOUNDARY_WIDTH + SHIMMER_HALF_WIDTH;
+        let along = -reach + 2.0 * reach * eased;
+        let (dx, dy) = SHIMMER_DIRECTION;
+        let centre = (
+            self.arena.center_x + dx * along,
+            self.arena.center_y + dy * along,
+        );
+        let point = |offset: f32| Point::from_xy(centre.0 + dx * offset, centre.1 + dy * offset);
+        let alpha = (SHIMMER_MAX_ALPHA * 255.0).round() as u8;
+        let Some(shader) = LinearGradient::new(
+            point(-SHIMMER_HALF_WIDTH),
+            point(SHIMMER_HALF_WIDTH),
+            vec![
+                GradientStop::new(0.0, rgba(SHIMMER, 0)),
+                GradientStop::new(0.5, rgba(SHIMMER, alpha)),
+                GradientStop::new(1.0, rgba(SHIMMER, 0)),
+            ],
+            SpreadMode::Pad,
+            Transform::identity(),
+        ) else {
+            return;
+        };
+        let paint = Paint {
+            shader,
+            anti_alias: true,
+            ..Paint::default()
+        };
+        let full = Rect::from_xywh(0.0, 0.0, layout::WIDTH as f32, layout::HEIGHT as f32)
+            .expect("non-zero frame size");
+        let clip = self.clip.as_ref().map(|(_, mask)| mask);
+        self.pixmap
+            .fill_rect(full, &paint, Transform::identity(), clip);
     }
 
     fn draw_text(&mut self, sim: &Simulation, palette: &Palette) {

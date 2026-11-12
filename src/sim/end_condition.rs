@@ -251,7 +251,8 @@ fn coverage(state: &SimState, radius: f64) -> f64 {
 }
 
 /// The balls have wiped the Film off the whole Arena: none is left at all,
-/// with no threshold and no rim margin (ADR 0002).
+/// with no threshold and no rim margin (ADR 0002). Its Ending has no flash:
+/// a shimmer sweeps across the clean Arena during the hold.
 struct ArenaCleared;
 
 impl EndCondition for ArenaCleared {
@@ -261,6 +262,14 @@ impl EndCondition for ArenaCleared {
 
     fn is_met(&self, state: &SimState, _substep: u64) -> bool {
         state.film.as_ref().is_some_and(|film| film.is_cleared())
+    }
+
+    fn ending(&self) -> EndingStyle {
+        EndingStyle {
+            flash: false,
+            finale: Finale::Shimmer,
+            ..EndingStyle::default()
+        }
     }
 }
 

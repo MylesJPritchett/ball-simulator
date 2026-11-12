@@ -34,6 +34,28 @@ fn arena_cleared_fires_on_the_substep_the_last_film_is_wiped() {
     }
 }
 
+#[test]
+fn a_regrowing_film_ends_the_run_on_the_first_substep_none_is_left() {
+    // The Film grows back while the growing ball wipes it, so Film left goes
+    // up as well as down; the run still ends the moment it first reaches 0.
+    let toml = growing_ball_wiping().replace("regrow = 0.0", "regrow = 30.0");
+    for seed in 0..3 {
+        let record = run(&toml, seed);
+        let film_left = &record.film_left;
+        assert!(
+            film_left.windows(2).any(|pair| pair[1].left > pair[0].left),
+            "seed {seed}: the Film never grew back"
+        );
+
+        assert_eq!(record.end.condition, "arena_cleared", "seed {seed}");
+        let cleared = film_left
+            .iter()
+            .find(|s| s.left == 0.0)
+            .expect("the Film is cleared");
+        assert_eq!(cleared.substep, record.end.substep, "seed {seed}");
+    }
+}
+
 /// A ball of radius 150 that never grows but speeds up 3% on every Boundary
 /// Hit, up to 4000 units/s, over a Film. A ball keeps the angle it hits the
 /// Boundary at, so it never comes nearer the centre than its path did at the

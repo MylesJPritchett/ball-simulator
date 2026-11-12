@@ -1,0 +1,65 @@
+# A race against the Film: one ball wipes the Film as it bounces while the
+# Film's edge grows back into what it has cleared. The ball speeds up and
+# grows a little on every Boundary Hit, and the run ends when no Film is
+# left. The Counter shows how much is left.
+
+name = "Regrowing race"
+hook_title = "Can it clear it before it grows back?"
+# Safety net only: on Seeds where the regrowth keeps up, the Film is never
+# cleared and the Quality Gate rejects the Seed.
+time_cap = 60.0
+
+[arena]
+radius = 460.0
+
+# Without gravity a bounce keeps its hit angle, so the ball never wipes
+# nearer the centre than its first path line minus its radius. It starts
+# big and grows to reach the middle; a small ball leaves a disc there.
+[ball]
+radius = 120.0
+speed = { min = 800.0, max = 900.0 }
+max_speed = 4000.0
+
+# Units a second the Film's edge grows back. Stronger and the regrowth
+# keeps up on too many Seeds; weaker and it hardly shows.
+[[rules]]
+kind = "film"
+regrow = { min = 20.0, max = 40.0 }
+
+[[rules]]
+kind = "speed_up"
+percent = { min = 2.5, max = 3.5 }
+
+# Small, so the ball is still under half the Arena radius when it wins.
+[[rules]]
+kind = "grow"
+amount = { min = 0.3, max = 0.5 }
+
+# Every Boundary Hit plays a note.
+[[rules]]
+kind = "play_note"
+
+# The Terminal State: the last of the Film is wiped, and a shimmer sweeps
+# across the cleared Arena during the hold.
+[end_condition]
+kind = "arena_cleared"
+
+[look]
+counter = "film_left"
+
+# Seeds outside these are rejected and replaced. Durations are Video length
+# in seconds (action plus the ~1.5 s ending hold).
+[quality_gate]
+min_duration = 25.0
+max_duration = 55.0
+min_boundary_hits = 100
+# Seconds from under 1% of the Film left to cleared: the end of the race
+# must not drag on with a speck of Film the ball keeps missing.
+max_final_stretch = 8.0
+# Fraction of the Arena radius: the ball wins by clearing, not by filling.
+max_ball_radius_at_end = 0.5
+
+[meta]
+title = "Can it clear it before it grows back? The Film regrows {rules[0].regrow} units a second"
+description = "The ball wipes the Film as it bounces, speeding up and growing a little on every Boundary Hit, while the Film grows back {rules[0].regrow} units a second. {boundary_hits} bounces in {duration} seconds to clear it."
+hashtags = ["race", "satisfying", "clear", "regrow"]

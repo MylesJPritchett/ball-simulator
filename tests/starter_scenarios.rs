@@ -7,6 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
+use ball_simulator::look::Counter;
 use ball_simulator::scenario::Scenario;
 use ball_simulator::sim;
 
@@ -113,6 +114,46 @@ fn faster_every_bounce_ends_when_its_ball_breaks_out() {
     let record = sim::run(&scenario, 1);
     assert_eq!(record.end.condition, "escaped");
     assert!(record.final_balls[0].escaping);
+}
+
+#[test]
+fn regrowing_race_ends_when_its_ball_clears_a_film_that_grows_back() {
+    let (_, scenario) = shipped()
+        .into_iter()
+        .find(|(_, s)| s.id == "regrowing_race")
+        .expect("regrowing_race ships");
+
+    assert_eq!(scenario.hook_title, "Can it clear it before it grows back?");
+    let kinds: Vec<&str> = scenario.rules.iter().map(|r| r.kind.as_str()).collect();
+    for kind in ["film", "speed_up", "grow", "play_note"] {
+        assert!(kinds.contains(&kind), "no '{kind}' Rule in {kinds:?}");
+    }
+    assert!(!kinds.contains(&"gravity"), "{kinds:?}");
+    assert_eq!(scenario.end_condition.kind, "arena_cleared");
+    assert_eq!(scenario.look.counter, Counter::FilmLeft);
+    let gate = &scenario.quality_gate;
+    assert!(gate.max_final_stretch.is_some());
+    assert!(gate.max_ball_radius_at_end.is_some_and(|max| max <= 0.5));
+    let meta = &scenario.meta;
+    for template in [&meta.title, &meta.description] {
+        let template = template.as_deref().unwrap_or_default();
+        assert!(template.contains(".regrow}"), "{template}");
+    }
+    assert!(meta
+        .description
+        .as_deref()
+        .unwrap_or_default()
+        .contains("{boundary_hits}"));
+
+    let record = sim::run(&scenario, 1);
+    assert_eq!(record.end.condition, "arena_cleared");
+    assert!(
+        record
+            .film_left
+            .windows(2)
+            .any(|pair| pair[1].left > pair[0].left),
+        "the Film never grew back"
+    );
 }
 
 #[test]

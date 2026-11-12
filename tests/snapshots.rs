@@ -171,6 +171,20 @@ fn growing_seed_1() {
 }
 
 #[test]
+fn regrowing_race_seed_1() {
+    assert_seed_1(
+        "regrowing_race",
+        Snapshot {
+            boundary_hits: 179,
+            final_ball_count: 1,
+            end_condition: "arena_cleared",
+            end_substep: 18642,
+            final_state_hash: 3557433651975198245,
+        },
+    );
+}
+
+#[test]
 fn shrinking_seed_1() {
     assert_seed_1(
         "shrinking",

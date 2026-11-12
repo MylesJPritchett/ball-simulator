@@ -793,3 +793,41 @@ fn the_films_edge_is_smooth_not_blocky() {
     }
     assert_eq!(blended, 80);
 }
+
+#[test]
+fn no_film_is_drawn_against_the_boundary_and_all_of_it_further_in() {
+    // The Boundary stroke starts at the Arena's edge. Film starts a sliver
+    // further in: pixels whose centre is 1.0 to 1.3 px inside the edge show
+    // at most a trace of it (the Film's smoothing blends across a cell);
+    // 8 to 10 px inside, all Film.
+    let arena = layout::arena();
+    for seed in 0..3 {
+        draw_frames(&wiping(), seed, 1, |sim, frame| {
+            let palette = sim.palette();
+            let (mut rim, mut inside) = (0, 0);
+            for y in 0..layout::HEIGHT {
+                for x in 0..layout::WIDTH {
+                    let dx = x as f32 + 0.5 - arena.center_x;
+                    let dy = y as f32 + 0.5 - arena.center_y;
+                    let r = (dx * dx + dy * dy).sqrt();
+                    let i = ((y * layout::WIDTH + x) * 4) as usize;
+                    let colour = [frame[i], frame[i + 1], frame[i + 2]];
+                    if (arena.radius - 1.3..=arena.radius - 1.0).contains(&r) {
+                        let film = (0..3)
+                            .map(|c| {
+                                let from = palette.background[c] as f32;
+                                (colour[c] as f32 - from) / (palette.film[c] as f32 - from)
+                            })
+                            .fold(0.0, f32::max);
+                        assert!(film <= 0.05, "seed {seed}: {x}, {y} is {film} Film");
+                        rim += 1;
+                    } else if (arena.radius - 10.0..=arena.radius - 8.0).contains(&r) {
+                        assert_eq!(colour, palette.film, "seed {seed}: {x}, {y}");
+                        inside += 1;
+                    }
+                }
+            }
+            assert!(rim > 500 && inside > 5000, "{rim} rim, {inside} inside");
+        });
+    }
+}

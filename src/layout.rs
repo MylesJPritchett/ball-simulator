@@ -19,6 +19,8 @@ pub const COUNTER_BAND: f32 = 180.0;
 pub const SIDE_MARGIN: f32 = 120.0;
 /// Space kept clear at the very top for the status bar / platform header.
 const TOP_MARGIN: f32 = 72.0;
+/// Width (px) of the Boundary's stroke, drawn just outside the Arena's edge.
+pub const BOUNDARY_WIDTH: f32 = 6.0;
 /// Gap between neighbouring regions.
 const GAP: f32 = 24.0;
 

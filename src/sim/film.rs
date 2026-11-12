@@ -1,14 +1,28 @@
 //! The Film: a layer over the inside of the Arena, held as a fixed grid of
 //! cells over the Arena's bounding square. Only cells whose centre is inside
-//! the Arena count; each either has Film or has been wiped. The renderer draws
-//! the Film from this same grid, so what is drawn and what is counted agree.
+//! the Arena, short of a sliver at the rim, count; each either has Film or has
+//! been wiped. The renderer draws the Film from this same grid, so what is
+//! drawn and what is counted agree.
 
 use super::Vec2;
+use crate::layout;
 
 /// Cells across the Arena's diameter: the Arena is drawn about 840 px across,
 /// so a cell is under two pixels and the Film's edge looks smooth once the
 /// renderer blends between cells.
 const CELLS: usize = 512;
+
+/// Width (px, as drawn) of the sliver just inside the Boundary where no Film
+/// is laid: half the Boundary stroke, about two cells. The stroke is drawn
+/// just outside the Arena's edge, and a bouncing ball's edge reaches that
+/// edge only at the one point it hits, so Film right against the Boundary
+/// would be wiped only by a Boundary Hit at exactly its angle, and a ball
+/// that only bounces would leave a thin rim of it for good. Two cells in, a
+/// hit wipes an arc of the rim (about 30 units wide for a ball of radius 30),
+/// so hits spread round the Boundary clear it. On screen the sliver is a
+/// thin dark edge along the inside of the stroke, the same in every frame,
+/// and the cells left out are neither drawn nor counted.
+const RIM_PX: f32 = layout::BOUNDARY_WIDTH / 2.0;
 
 /// How far, in cells, the edge advances for each ring grown. Rings alternate
 /// between side and corner neighbours, so after `2m` rings Film has reached
@@ -24,6 +38,9 @@ pub struct Film {
     radius: f64,
     /// Side of a cell, in simulation units.
     cell: f64,
+    /// Width of the sliver inside the Boundary left without Film, in
+    /// simulation units: [`RIM_PX`] at the scale the Arena is drawn.
+    rim: f64,
     /// Whether each cell has Film, row-major from the top-left corner of the
     /// bounding square. Cells outside the Arena never do.
     cells: Vec<bool>,
@@ -54,6 +71,7 @@ impl Film {
         let mut film = Film {
             radius,
             cell,
+            rim: RIM_PX as f64 * radius / layout::arena().radius as f64,
             cells: vec![false; CELLS * CELLS],
             total: 0,
             left: 0,
@@ -64,7 +82,7 @@ impl Film {
         };
         for row in 0..CELLS {
             for col in 0..CELLS {
-                if film.centre(col, row).length() <= radius {
+                if film.is_inside(row * CELLS + col) {
                     film.cells[row * CELLS + col] = true;
                     film.total += 1;
                 }
@@ -200,9 +218,9 @@ impl Film {
         })
     }
 
-    /// Whether the cell's centre is inside the Arena.
+    /// Whether the cell's centre is inside the Arena, short of the rim.
     fn is_inside(&self, index: usize) -> bool {
-        self.centre(index % CELLS, index / CELLS).length() <= self.radius
+        self.centre(index % CELLS, index / CELLS).length() <= self.radius - self.rim
     }
 
     /// How much Film there is at `p`, from 0 to 1, blended between the

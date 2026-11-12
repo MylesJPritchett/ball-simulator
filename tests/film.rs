@@ -19,6 +19,20 @@ fn the_film_covers_the_whole_arena_at_the_start() {
 }
 
 #[test]
+fn no_film_is_laid_against_the_boundary_but_all_of_the_arena_further_in_has_it() {
+    // Arena radius 460, drawn 420 px across its radius: the 3 px sliver at
+    // the rim (half the Boundary stroke) is 3.3 units.
+    let film = Film::new(460.0);
+    for step in 0..360 {
+        let angle = step as f64 * std::f64::consts::PI / 180.0;
+        let at = |r: f64| Vec2::new(r * angle.cos(), r * angle.sin());
+        assert_eq!(film.coverage_at(at(459.5)), 0.0, "{step} degrees");
+        assert_eq!(film.coverage_at(at(454.0)), 1.0, "{step} degrees");
+        assert_eq!(film.coverage_at(at(300.0)), 1.0, "{step} degrees");
+    }
+}
+
+#[test]
 fn without_a_film_rule_there_is_no_film() {
     assert!(run(MINIMAL, 1).film_left.is_empty());
 }

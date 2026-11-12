@@ -211,8 +211,8 @@ fn film_left_counter_counts_down_from_100_percent_to_0_percent() {
 
 #[test]
 fn film_left_counter_never_shows_0_percent_while_film_is_left() {
-    // After 30 s a tiny patch, well under half a percent, is still left.
-    let readings = counter_text_every_frame(&wiping_with_film_left_counter(30.0), 1);
+    // After 10 s a tiny patch, well under half a percent, is still left.
+    let readings = counter_text_every_frame(&wiping_with_film_left_counter(10.0), 1);
 
     let (last, left) = readings.last().unwrap();
     assert!(*left > 0.0 && *left < 0.005, "left {left}");

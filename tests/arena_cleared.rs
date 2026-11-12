@@ -34,6 +34,33 @@ fn arena_cleared_fires_on_the_substep_the_last_film_is_wiped() {
     }
 }
 
+/// A ball of radius 150 that never grows but speeds up 3% on every Boundary
+/// Hit, up to 4000 units/s, over a Film. A ball keeps the angle it hits the
+/// Boundary at, so it never comes nearer the centre than its path did at the
+/// start: one much smaller than this (such as the default 30) leaves a disc
+/// in the middle, and so does any ball sent nearly through the centre, back
+/// and forth along the same line (seeds 0 and 16 here).
+fn speeding_ball_wiping() -> String {
+    MINIMAL
+        .replace("time_cap = 5.0", "time_cap = 60.0")
+        .replace("radius = 30.0", "radius = 150.0")
+        .replace("speed = 900.0", "speed = 900.0\nmax_speed = 4000.0")
+        + "\n[[rules]]\nkind = \"speed_up\"\npercent = 3.0\n"
+        + FILM
+        + ARENA_CLEARED_END
+}
+
+#[test]
+fn a_ball_that_only_bounces_clears_the_film_right_up_to_the_boundary() {
+    for seed in 1..=5 {
+        let record = run(&speeding_ball_wiping(), seed);
+
+        assert_eq!(record.end.condition, "arena_cleared", "seed {seed}");
+        let seconds = record.end.substep as f64 / sim::SUBSTEP_HZ as f64;
+        assert!(seconds < 45.0, "seed {seed}: cleared after {seconds} s");
+    }
+}
+
 #[test]
 fn the_final_chord_sounds_when_the_arena_is_cleared() {
     use ball_simulator::audio::{voices, SAMPLES_PER_SUBSTEP};

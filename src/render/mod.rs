@@ -30,7 +30,7 @@ use heat::Heat;
 use meltdown::Meltdown;
 use text::{FittedText, TextPainter};
 
-const BOUNDARY_WIDTH: f32 = 6.0;
+use crate::layout::BOUNDARY_WIDTH;
 /// Angle (radians) between the points of a Boundary arc drawn around a Gap:
 /// half a degree strays well under a pixel from the true circle.
 const BOUNDARY_ARC_STEP: f64 = std::f64::consts::PI / 360.0;

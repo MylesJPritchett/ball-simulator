@@ -551,38 +551,31 @@ impl Renderer {
         };
         for settle in &state.settles {
             paint.set_color(rgb(palette.ball(settle.colour as usize)));
-            let mut pb = PathBuilder::new();
-            pb.push_circle(x, y, settle.radius as f32 * self.scale);
+            let outer = settle.radius as f32 * self.scale;
             let hole = (settle.radius - settle.thickness) as f32 * self.scale;
-            if hole > 0.0 {
-                pb.push_circle(x, y, hole);
-            }
-            if let Some(path) = pb.finish() {
-                self.pixmap.fill_path(
-                    &path,
-                    &paint,
-                    FillRule::EvenOdd,
-                    Transform::identity(),
-                    None,
-                );
-            }
+            self.fill_annulus(&paint, (x, y), outer, Some(hole));
         }
         if let (true, Some(last)) = (state.arena.solid, state.settles.last()) {
             paint.set_color(rgb(palette.ball(last.colour as usize)));
-            let mut pb = PathBuilder::new();
-            pb.push_circle(x, y, self.boundary_radius(sim));
-            if let Some(peg) = state.arena.peg_radius {
-                pb.push_circle(x, y, peg as f32 * self.scale);
-            }
-            if let Some(rest) = pb.finish() {
-                self.pixmap.fill_path(
-                    &rest,
-                    &paint,
-                    FillRule::EvenOdd,
-                    Transform::identity(),
-                    None,
-                );
-            }
+            let peg = state.arena.peg_radius.map(|peg| peg as f32 * self.scale);
+            self.fill_annulus(&paint, (x, y), self.boundary_radius(sim), peg);
+        }
+    }
+
+    /// Fills the disc of radius `outer` (pixels) centred on `centre`, less
+    /// the concentric `hole` if there is one, so the background shows
+    /// through it.
+    fn fill_annulus(&mut self, paint: &Paint, centre: (f32, f32), outer: f32, hole: Option<f32>) {
+        let (x, y) = centre;
+        let mut pb = PathBuilder::new();
+        pb.push_circle(x, y, outer);
+        if let Some(hole) = hole.filter(|&hole| hole > 0.0) {
+            pb.push_circle(x, y, hole);
+        }
+        if let Some(path) = pb.finish() {
+            // The even-odd rule leaves the hole unfilled.
+            self.pixmap
+                .fill_path(&path, paint, FillRule::EvenOdd, Transform::identity(), None);
         }
     }
 
@@ -594,25 +587,9 @@ impl Renderer {
         for ball in &sim.state().balls {
             let (x, y) = self.to_screen(ball.pos.x, ball.pos.y);
             paint.shader = Shader::SolidColor(rgb(palette.ball(ball_slot(ball))));
-            // A Ring is an annulus: its hole is a second circle, left
-            // unfilled by the even-odd rule so the background shows through.
-            let mut pb = PathBuilder::new();
-            pb.push_circle(x, y, ball.radius as f32 * self.scale);
-            if let Some(thickness) = ball.thickness {
-                let hole = (ball.radius - thickness) as f32 * self.scale;
-                if hole > 0.0 {
-                    pb.push_circle(x, y, hole);
-                }
-            }
-            if let Some(path) = pb.finish() {
-                self.pixmap.fill_path(
-                    &path,
-                    &paint,
-                    FillRule::EvenOdd,
-                    Transform::identity(),
-                    None,
-                );
-            }
+            // A Ring is an annulus round its hole.
+            let hole = ball.hole_radius().map(|hole| hole as f32 * self.scale);
+            self.fill_annulus(&paint, (x, y), ball.radius as f32 * self.scale, hole);
         }
     }
 

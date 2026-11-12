@@ -152,7 +152,8 @@ impl Arena {
     /// before its inner edge meets the Peg. `None` without a Peg, or for a
     /// solid ball.
     pub fn peg_room(&self, radius: f64, thickness: Option<f64>) -> Option<f64> {
-        Some((radius - thickness? - self.peg_radius?).max(0.0))
+        let hole = radius - thickness?;
+        Some((hole - self.peg_radius?).max(0.0))
     }
 
     /// The radius at which a Ring this thick fits the Peg exactly (its hole
@@ -230,6 +231,14 @@ pub struct Ball {
     /// the hole is only how a Ring looks; it moves like a solid ball.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thickness: Option<f64>,
+}
+
+impl Ball {
+    /// For a Ring, the radius of its hole: its radius less its thickness.
+    /// `None` for a solid ball.
+    pub fn hole_radius(&self) -> Option<f64> {
+        Some(self.radius - self.thickness?)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

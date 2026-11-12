@@ -79,7 +79,7 @@ The Boundary breaking all the way round at the first Boundary Hit at max speed: 
 A ball passing out through an opening a Rule made in the Boundary (such as a Gap). An escaping ball is no longer held by the Boundary or pulled by gravity and drag, so it flies straight out of the frame.
 
 **Film**:
-A layer over the inside of the Arena that a ball wipes away wherever it passes; it may grow back from the Film still left. The Arena is cleared when no Film is left.
+A layer over the inside of the Arena (short of a sliver along the Boundary) that a ball wipes away wherever it passes; it may grow back from the Film still left. The Arena is cleared when no Film is left.
 _Avoid_: Background, coat, fog
 
 **Boundary Hit**:

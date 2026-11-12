@@ -1,9 +1,12 @@
-//! Rings settling into the Boundary until the Arena is solid, through the
-//! simulation seam.
+//! Rings settling into the Boundary, or onto the Peg, until the Arena is
+//! solid, through the simulation seam.
 
 mod support;
 
-use ball_simulator::sim::{Simulation, Surface};
+use std::path::Path;
+
+use ball_simulator::scenario::Scenario;
+use ball_simulator::sim::{self, Simulation, Surface};
 use support::{run, scenario, MINIMAL};
 
 /// A Ring (radius 30, thickness 20) in an Arena of radius 460 that grows by
@@ -262,4 +265,92 @@ fn the_same_seed_gives_the_same_record_round_a_peg() {
         assert_eq!(run(&toml, seed), run(&toml, seed), "seed {seed}");
     }
     assert_ne!(run(&toml, 0), run(&toml, 1));
+}
+
+fn shipped(id: &str) -> Scenario {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("scenarios")
+        .join(format!("{id}.toml"));
+    Scenario::from_file(&path).expect("shipped Scenario should be valid")
+}
+
+/// The shipped Ring Scenarios and the Surface their Rings settle against.
+const RING_SCENARIOS: [(&str, Surface); 2] = [
+    ("growing_rings", Surface::Boundary),
+    ("shrinking_rings", Surface::Peg),
+];
+
+#[test]
+fn a_settling_ring_becomes_its_layer_with_no_visible_jump() {
+    // The layer a Ring settles into is drawn where the Ring was the substep
+    // before, give or take the one grow (or shrink) of the hit that settled
+    // it. (A frame can hold several hits at these speeds, so this is checked
+    // substep by substep: across a frame the Ring may have grown twice.)
+    for (id, surface) in RING_SCENARIOS {
+        for seed in 1..=3 {
+            let mut sim = Simulation::new(&shipped(id), seed);
+            let amount = sim.scenario().rules[0].params["amount"]
+                .as_float()
+                .expect("the first Rule grows or shrinks by an amount");
+            let tolerance = amount + 1e-9;
+            let mut checked = 0;
+            while !sim.is_frozen() {
+                let before = sim.state().balls.clone();
+                let settled = sim.state().settles.len();
+                sim.step();
+                let Some(layer) = sim.state().settles.get(settled) else {
+                    continue;
+                };
+                let [ring] = before.as_slice() else {
+                    panic!("{id} seed {seed}: one Ring at a time, got {before:?}");
+                };
+                assert_eq!(layer.surface, surface, "{id} seed {seed}");
+                assert_eq!(Some(layer.thickness), ring.thickness, "{id} seed {seed}");
+                // A layer is concentric with the Arena.
+                let off_centre = ring.pos.length();
+                let resized = (ring.radius - layer.radius).abs();
+                assert!(
+                    off_centre <= tolerance && resized <= tolerance,
+                    "{id} seed {seed}, settle {settled}: Ring drawn {off_centre} off \
+                     centre at radius {}, layer at radius {} (tolerance {tolerance})",
+                    ring.radius,
+                    layer.radius
+                );
+                checked += 1;
+            }
+            assert!(
+                checked > 10,
+                "{id} seed {seed}: only {checked} settles seen"
+            );
+        }
+    }
+}
+
+#[test]
+fn each_ring_takes_less_time_to_settle_than_the_last() {
+    // As the Arena fills (or the Peg grows), each Ring has less far to go:
+    // the substeps between successive settles never grow, and the last cycle
+    // is a small fraction of the first.
+    for (id, _) in RING_SCENARIOS {
+        for seed in 1..=3 {
+            let record = sim::run(&shipped(id), seed);
+            let mut previous = 0;
+            let cycles: Vec<u64> = record
+                .settles
+                .iter()
+                .map(|settle| {
+                    let cycle = settle.substep - previous;
+                    previous = settle.substep;
+                    cycle
+                })
+                .collect();
+            assert!(cycles.len() > 10, "{id} seed {seed}: {cycles:?}");
+            assert!(
+                cycles.windows(2).all(|pair| pair[1] <= pair[0]),
+                "{id} seed {seed}: a cycle got longer: {cycles:?}"
+            );
+            let (first, last) = (cycles[0], cycles[cycles.len() - 1]);
+            assert!(last * 10 < first, "{id} seed {seed}: {cycles:?}");
+        }
+    }
 }

@@ -51,7 +51,7 @@ How many balls overlap at a point in the Arena, shown as colour that reaches whi
 The live number shown below the Arena (ball count, Boundary Hit count, or speed), chosen by the Scenario.
 
 **Quality Gate**:
-A headless dry run of a Seed that rejects it if the resulting Video would be dull (ends too soon, never ends, too few Boundary Hits).
+A headless dry run of a Seed that rejects it if the resulting Video would be dull (ends too soon, never ends, too few Boundary Hits, stalls hunting the last of the Film, or is won by a ball that fills the Arena).
 
 **Population Cap**:
 The maximum number of balls in a Video; splitting stops once it is reached.
@@ -77,6 +77,10 @@ The Boundary breaking all the way round at the first Boundary Hit at max speed: 
 
 **Escape**:
 A ball passing out through an opening a Rule made in the Boundary (such as a Gap). An escaping ball is no longer held by the Boundary or pulled by gravity and drag, so it flies straight out of the frame.
+
+**Film**:
+A layer over the inside of the Arena that a ball wipes away wherever it passes; it may grow back from the Film still left. The Arena is cleared when no Film is left.
+_Avoid_: Background, coat, fog
 
 **Boundary Hit**:
 A ball touching the Boundary; the default trigger for sounds and on-hit Rules. Balls pass through each other unless a Rule says otherwise.

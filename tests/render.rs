@@ -679,3 +679,117 @@ fn the_boundary_is_drawn_shattered_once_the_ball_breaks_out() {
     });
     assert!(checked > 60, "{checked} frames checked");
 }
+
+/// MINIMAL's ball (radius 30) moving at 100 units/s over a Film, without
+/// trails or glows. It starts within 215 units of the centre, so for its
+/// first 2 s (120 frames) it travels in a straight line.
+fn wiping() -> String {
+    format!(
+        "{}\n[[rules]]\nkind = \"film\"\nregrow = 0.0\n\n[look]\ntrails = false\nglow = false\n",
+        MINIMAL.replace("speed = 900.0", "speed = 100.0")
+    )
+}
+
+/// The ball's straight path over the first 120 frames of [`wiping`], on
+/// screen: the frame, the path's midpoint, the unit direction along it and
+/// the ball's radius, in pixels.
+struct Wiped {
+    frame: Vec<u8>,
+    mid: (f32, f32),
+    dir: (f32, f32),
+    radius: f32,
+}
+
+impl Wiped {
+    fn at(&self, along: f32, across: f32) -> [u8; 3] {
+        let (dx, dy) = self.dir;
+        pixel(
+            &self.frame,
+            self.mid.0 + dx * along - dy * across,
+            self.mid.1 + dy * along + dx * across,
+        )
+    }
+}
+
+/// Where a ball at `pos` (sim units) is on screen in [`wiping`] (Arena 460).
+fn on_screen(pos: sim::Vec2) -> (f32, f32) {
+    let arena = layout::arena();
+    let scale = arena.radius / 460.0;
+    (
+        arena.center_x + pos.x as f32 * scale,
+        arena.center_y + pos.y as f32 * scale,
+    )
+}
+
+fn wiped_path(seed: u64) -> Wiped {
+    let mut found = None;
+    let mut k = 0;
+    draw_frames(&wiping(), seed, 121, |sim, frame| {
+        if k == 120 {
+            let ball = &sim.state().balls[0];
+            let dir = ball.vel * (1.0 / ball.vel.length());
+            let scale = layout::arena().radius / 460.0;
+            found = Some(Wiped {
+                frame: frame.to_vec(),
+                // 200 units travelled: the midpoint is 100 behind the ball.
+                mid: on_screen(ball.pos - dir * 100.0),
+                dir: (dir.x as f32, dir.y as f32),
+                radius: ball.radius as f32 * scale,
+            });
+        }
+        k += 1;
+    });
+    found.expect("120 frames drawn")
+}
+
+#[test]
+fn the_film_is_drawn_over_the_arena_and_wiped_where_the_ball_went() {
+    for seed in 0..3 {
+        let mut film = None;
+        draw_frames(&wiping(), seed, 1, |sim, frame| {
+            // 300 units from the centre on the far side from the ball.
+            let ball = sim.state().balls[0].pos;
+            let away = if ball.length() > 0.0 {
+                ball * (-300.0 / ball.length())
+            } else {
+                sim::Vec2::new(300.0, 0.0)
+            };
+            let (x, y) = on_screen(away);
+            assert_eq!(pixel(frame, x, y), sim.palette().film, "seed {seed}");
+            film = Some((sim.palette().film, sim.palette().background));
+        });
+        let (film, background) = film.expect("frame 0 drawn");
+        assert_ne!(film, background);
+
+        let path = wiped_path(seed);
+        for along in [-80.0, -40.0, 0.0, 40.0] {
+            for across in [-0.8, 0.0, 0.8] {
+                assert_eq!(
+                    path.at(along, across * path.radius),
+                    background,
+                    "seed {seed}: {along}, {across} from the path's midpoint"
+                );
+            }
+        }
+        assert_eq!(path.at(0.0, 1.5 * path.radius), film, "seed {seed}");
+        assert_eq!(path.at(0.0, -1.5 * path.radius), film, "seed {seed}");
+    }
+}
+
+#[test]
+fn the_films_edge_is_smooth_not_blocky() {
+    // Drawn straight from its cells, the Film's edge would be a staircase of
+    // whole Film and cleared pixels. Smooth, every step along the wiped
+    // band's edge has a pixel blending the two.
+    let path = wiped_path(1);
+    let mut blended = 0;
+    for step in -40..40 {
+        let along = step as f32 * 2.0;
+        let blends = (-6..=6).any(|d| {
+            let colour = path.at(along, path.radius + d as f32 * 0.5);
+            colour != path.at(0.0, 0.0) && colour != path.at(0.0, 2.0 * path.radius)
+        });
+        blended += blends as usize;
+    }
+    assert_eq!(blended, 80);
+}

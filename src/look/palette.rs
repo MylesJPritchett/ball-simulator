@@ -22,6 +22,9 @@ pub struct Palette {
     /// Dark background behind everything.
     pub background: Rgb,
     pub boundary: Rgb,
+    /// The Film over the Arena: a muted mid-tone that stands out from the
+    /// background (the cleared Arena) and that the balls stand out from.
+    pub film: Rgb,
     /// Hook Title and Counter text.
     pub text: Rgb,
     pub balls: [Rgb; BALL_SLOTS],
@@ -43,6 +46,7 @@ pub const PALETTES: &[Palette] = &[
         name: "sunset",
         background: [16, 10, 24],
         boundary: [246, 232, 222],
+        film: [104, 70, 118],
         text: [250, 240, 234],
         balls: [
             [255, 107, 107],
@@ -62,6 +66,7 @@ pub const PALETTES: &[Palette] = &[
         name: "neon",
         background: [8, 8, 18],
         boundary: [222, 240, 255],
+        film: [62, 80, 132],
         text: [236, 246, 255],
         balls: [
             [0, 245, 212],
@@ -81,6 +86,7 @@ pub const PALETTES: &[Palette] = &[
         name: "ocean",
         background: [6, 14, 26],
         boundary: [214, 238, 250],
+        film: [44, 88, 118],
         text: [232, 246, 252],
         balls: [
             [76, 201, 240],
@@ -100,6 +106,7 @@ pub const PALETTES: &[Palette] = &[
         name: "candy",
         background: [20, 12, 24],
         boundary: [252, 236, 246],
+        film: [108, 78, 114],
         text: [255, 244, 250],
         balls: [
             [255, 153, 200],
@@ -119,6 +126,7 @@ pub const PALETTES: &[Palette] = &[
         name: "ember",
         background: [18, 8, 8],
         boundary: [255, 228, 206],
+        film: [116, 70, 58],
         text: [255, 240, 228],
         balls: [
             [255, 77, 0],
@@ -133,6 +141,7 @@ pub const PALETTES: &[Palette] = &[
         name: "aurora",
         background: [6, 12, 18],
         boundary: [220, 250, 240],
+        film: [46, 90, 92],
         text: [236, 255, 248],
         balls: [
             [124, 255, 107],

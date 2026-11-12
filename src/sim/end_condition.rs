@@ -17,6 +17,7 @@ use crate::sim::SimState;
 pub const TIME_CAP: &str = "time_cap";
 pub const ARENA_FILLED: &str = "arena_filled";
 pub const ARENA_COVERED: &str = "arena_covered";
+pub const ARENA_CLEARED: &str = "arena_cleared";
 pub const VANISHED: &str = "vanished";
 pub const ESCAPED: &str = "escaped";
 pub const MELTDOWN: &str = "meltdown";
@@ -66,6 +67,16 @@ pub fn build(scenario: &Scenario) -> Result<Box<dyn EndCondition>, String> {
         ARENA_COVERED => {
             no_params(spec)?;
             Ok(Box::new(ArenaCovered))
+        }
+        ARENA_CLEARED => {
+            no_params(spec)?;
+            needs_rule(
+                scenario,
+                |rule| rule.lays_film(),
+                "lays a Film",
+                crate::rules::FILM,
+            )?;
+            Ok(Box::new(ArenaCleared))
         }
         VANISHED => {
             no_params(spec)?;
@@ -237,6 +248,20 @@ fn coverage(state: &SimState, radius: f64) -> f64 {
         }
     }
     covered.iter().filter(|&&c| c).count() as f64 / circle_cells as f64
+}
+
+/// The balls have wiped the Film off the whole Arena: none is left at all,
+/// with no threshold and no rim margin (ADR 0002).
+struct ArenaCleared;
+
+impl EndCondition for ArenaCleared {
+    fn id(&self) -> &'static str {
+        ARENA_CLEARED
+    }
+
+    fn is_met(&self, state: &SimState, _substep: u64) -> bool {
+        state.film.as_ref().is_some_and(|film| film.is_cleared())
+    }
 }
 
 /// How long a vanished ball's pop plays out before the freeze.

@@ -5,7 +5,7 @@ mod support;
 
 use std::collections::BTreeSet;
 
-use ball_simulator::look::palette;
+use ball_simulator::look::{palette, Counter};
 use ball_simulator::scenario::Scenario;
 use ball_simulator::sim::{SimRecord, Simulation};
 use support::{run, scenario, MINIMAL};
@@ -132,10 +132,92 @@ fn trails_and_glow_are_on_by_default_and_can_be_switched_off() {
     assert!(!off.trails && !off.glow);
 }
 
+/// WCAG contrast ratio between two sRGB colours (1 to 21).
+fn contrast(a: [u8; 3], b: [u8; 3]) -> f64 {
+    let luminance = |c: [u8; 3]| {
+        let lin = |v: u8| {
+            let v = v as f64 / 255.0;
+            if v <= 0.04045 {
+                v / 12.92
+            } else {
+                ((v + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2])
+    };
+    let (la, lb) = (luminance(a), luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
+#[test]
+fn the_film_stands_out_from_the_cleared_arena_in_every_palette() {
+    // The cleared Arena is the background. 2.5:1 is well clear of the dark
+    // backgrounds while leaving the balls room to stand out from the Film.
+    for p in palette::PALETTES {
+        let ratio = contrast(p.film, p.background);
+        assert!(ratio >= 2.5, "{}: Film contrast {ratio:.2}", p.name);
+    }
+}
+
 #[test]
 fn unknown_counter_is_rejected() {
     let err = Scenario::from_toml_str("broken", &with_look("counter = \"vibes\""))
         .expect_err("unknown Counter should be rejected")
         .to_string();
     assert!(err.contains("vibes"), "{err}");
+}
+
+/// Steps a Scenario frame by frame, collecting the Counter text as the
+/// renderer draws it, with the Film left at that frame.
+fn counter_text_every_frame(toml: &str, seed: u64) -> Vec<(String, f64)> {
+    let scenario = scenario(toml);
+    let counter = scenario.look.counter;
+    let mut sim = Simulation::new(&scenario, seed);
+    let mut readings = Vec::new();
+    loop {
+        let left = sim.state().film.as_ref().map_or(0.0, |f| f.left());
+        readings.push((counter.text(&sim), left));
+        if sim.is_frozen() {
+            break;
+        }
+        sim.step_frame();
+    }
+    readings
+}
+
+/// A big ball wiping a Film for `seconds`, with the Film left Counter.
+fn wiping_with_film_left_counter(seconds: f64) -> String {
+    MINIMAL
+        .replace("time_cap = 5.0", &format!("time_cap = {seconds:?}"))
+        .replace("radius = 30.0", "radius = 300.0")
+        + "\n[[rules]]\nkind = \"film\"\nregrow = 0.0\n"
+        + "\n[look]\ncounter = \"film_left\"\n"
+}
+
+#[test]
+fn film_left_counter_counts_down_from_100_percent_to_0_percent() {
+    // The ball grows on every Boundary Hit until it fills the Arena, wiping
+    // all of the Film.
+    let growing =
+        wiping_with_film_left_counter(30.0) + "\n[[rules]]\nkind = \"grow\"\namount = 20.0\n";
+    let readings = counter_text_every_frame(&growing, 1);
+
+    assert_eq!(readings[0].0, "100%");
+    let (last, left) = readings.last().unwrap();
+    assert_eq!(*left, 0.0, "the Film should be cleared by the end");
+    assert_eq!(last, "0%");
+    assert_eq!(Counter::FilmLeft.label(0), "FILM LEFT");
+}
+
+#[test]
+fn film_left_counter_never_shows_0_percent_while_film_is_left() {
+    // After 30 s a tiny patch, well under half a percent, is still left.
+    let readings = counter_text_every_frame(&wiping_with_film_left_counter(30.0), 1);
+
+    let (last, left) = readings.last().unwrap();
+    assert!(*left > 0.0 && *left < 0.005, "left {left}");
+    assert_eq!(last, "1%");
+    for (text, left) in &readings {
+        assert_eq!(text == "0%", *left == 0.0, "{text} with {left} left");
+    }
 }

@@ -5,6 +5,8 @@ use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
 use serde::Serialize;
 
+use super::Film;
+
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize)]
 pub struct Vec2 {
     pub x: f64,
@@ -197,6 +199,8 @@ pub struct Ball {
 pub struct SimState {
     pub arena: Arena,
     pub balls: Vec<Ball>,
+    /// The Film over the inside of the Arena, once a `film` Rule has laid it.
+    pub film: Option<Film>,
     /// Balls that have vanished from the Arena, as they were just before,
     /// in the order they vanished.
     pub vanished: Vec<Ball>,
@@ -210,6 +214,7 @@ impl SimState {
         SimState {
             arena,
             balls: Vec::new(),
+            film: None,
             vanished: Vec::new(),
             vanishing: Vec::new(),
             next_ball_id: 0,

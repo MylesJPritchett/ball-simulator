@@ -8,7 +8,7 @@
 //! trails = true             # fading motion trails (default true)
 //! glow = true               # glow where each Boundary Hit lands (default true)
 //! heat = false              # colour by how many balls overlap (default false)
-//! counter = "ball_count"    # "boundary_hits" (default), "ball_count" or "speed"
+//! counter = "ball_count"    # "boundary_hits" (default), "ball_count", "speed" or "film_left"
 //! ```
 
 pub mod counter;

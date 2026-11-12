@@ -138,6 +138,20 @@ fn quality_gate_duration_range_must_not_be_inverted() {
 }
 
 #[test]
+fn film_quality_gate_thresholds_must_be_positive() {
+    for key in ["max_final_stretch", "max_ball_radius_at_end"] {
+        for value in ["-1.0", "0.0", "nan"] {
+            let toml = format!("{}\n[quality_gate]\n{key} = {value}\n", complete());
+            let err = error_for(&toml);
+            assert!(
+                err.contains(&format!("quality_gate.{key} must be greater than 0")),
+                "{key} = {value}: {err}"
+            );
+        }
+    }
+}
+
+#[test]
 fn unknown_quality_gate_threshold_is_named_in_the_error() {
     let toml = format!("{}\n[quality_gate]\nmin_hits = 3\n", complete());
     let err = error_for(&toml);

@@ -290,7 +290,7 @@ impl Scenario {
             if !(peg.is_finite() && peg > 0.0) {
                 return Err(self.invalid("arena.peg_radius must be greater than 0 and finite"));
             }
-            // Solid balls colliding with a Peg are not modelled.
+            // Solid balls hitting a Peg are not modelled.
             let Some(thickness) = self.ball.thickness else {
                 return Err(self.invalid(
                     "arena.peg_radius needs a Ring ball (set ball.thickness): \

@@ -36,10 +36,18 @@ use crate::sim::{Ball, SettleEvent, SimState, Surface, Vec2};
 struct Params {}
 
 pub struct Settle {
-    /// Each new Ring is a copy of the first as it started: (radius,
-    /// thickness, speed). `None` until the start, or if the ball is solid.
-    /// Round a Peg, a new Ring is as big as the Arena instead.
-    new_ring: Option<(f64, f64, f64)>,
+    /// Each new Ring is a copy of the first as it started. `None` until the
+    /// start, or if the ball is solid.
+    new_ring: Option<NewRing>,
+}
+
+/// The first Ring as it started, which each new Ring copies. Round a Peg, a
+/// new Ring is as big as the Arena instead of `radius`.
+#[derive(Clone, Copy)]
+struct NewRing {
+    radius: f64,
+    thickness: f64,
+    speed: f64,
 }
 
 impl Settle {
@@ -56,17 +64,29 @@ impl Rule for Settle {
 
     fn on_start(&mut self, state: &mut SimState, _ctx: &mut RuleContext) {
         self.new_ring = state.balls.first().and_then(|ball| {
-            let thickness = ball.thickness?;
-            Some((ball.radius, thickness, ball.vel.length()))
+            Some(NewRing {
+                radius: ball.radius,
+                thickness: ball.thickness?,
+                speed: ball.vel.length(),
+            })
         });
     }
 
     fn on_substep_end(&mut self, state: &mut SimState, ctx: &mut RuleContext) {
-        let Some((radius, thickness, speed)) = self.new_ring else {
+        let Some(NewRing {
+            radius,
+            thickness,
+            speed,
+        }) = self.new_ring
+        else {
             return;
         };
         let arena = state.arena.radius;
         let peg = state.arena.peg_radius;
+        let surface = match peg {
+            None => Surface::Boundary,
+            Some(_) => Surface::Peg,
+        };
         // Exactly the fits the simulation clamps to.
         let can_no_longer_move = |ball: &Ball| match (ball.thickness, peg) {
             (None, _) => false,
@@ -81,10 +101,7 @@ impl Rule for Settle {
         state.settles.push(SettleEvent {
             substep: ctx.substep + 1,
             colour: ring.colour,
-            surface: match peg {
-                None => Surface::Boundary,
-                Some(_) => Surface::Peg,
-            },
+            surface,
             radius: ring.radius,
             thickness: ring_thickness,
         });

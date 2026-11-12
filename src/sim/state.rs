@@ -142,10 +142,23 @@ impl Arena {
     /// round a Peg, its inner edge meets the Peg.
     pub fn room(&self, radius: f64, thickness: Option<f64>) -> f64 {
         let boundary = self.radius - radius;
-        match (self.peg_radius, thickness) {
-            (Some(peg), Some(thickness)) => boundary.min((radius - thickness - peg).max(0.0)),
-            _ => boundary,
+        match self.peg_room(radius, thickness) {
+            Some(peg) => boundary.min(peg),
+            None => boundary,
         }
+    }
+
+    /// How far from the Arena's centre a Ring this big and thick can be
+    /// before its inner edge meets the Peg. `None` without a Peg, or for a
+    /// solid ball.
+    pub fn peg_room(&self, radius: f64, thickness: Option<f64>) -> Option<f64> {
+        Some((radius - thickness? - self.peg_radius?).max(0.0))
+    }
+
+    /// The radius at which a Ring this thick fits the Peg exactly (its hole
+    /// is the Peg's size): the smallest it can be. `None` without a Peg.
+    pub fn peg_fit(&self, thickness: f64) -> Option<f64> {
+        self.peg_radius.map(|peg| peg + thickness)
     }
 
     /// Whether the Boundary is open (in a Gap) at `angle`.
@@ -276,8 +289,8 @@ impl SimState {
     pub fn contain(&mut self) {
         let SimState { arena, balls, .. } = self;
         for ball in balls.iter_mut().filter(|ball| !ball.escaping) {
-            if let (Some(peg), Some(thickness)) = (arena.peg_radius, ball.thickness) {
-                ball.radius = ball.radius.max(peg + thickness);
+            if let Some(fit) = ball.thickness.and_then(|t| arena.peg_fit(t)) {
+                ball.radius = ball.radius.max(fit);
             }
             ball.radius = ball.radius.min(arena.radius);
             let limit = arena.room(ball.radius, ball.thickness);

@@ -291,9 +291,8 @@ impl Simulation {
             if overshoot > self.stats.max_boundary_overshoot {
                 self.stats.max_boundary_overshoot = overshoot;
             }
-            if let (Some(peg), Some(thickness)) = (arena.peg_radius, ball.thickness) {
-                let hole = ball.radius - thickness;
-                let overshoot = ball.pos.length() + peg - hole;
+            if let Some(room) = arena.peg_room(ball.radius, ball.thickness) {
+                let overshoot = ball.pos.length() - room;
                 self.stats.max_peg_overshoot = self.stats.max_peg_overshoot.max(overshoot);
             }
         }
@@ -391,14 +390,12 @@ fn resolve_boundary(ball: &mut Ball, arena: &Arena, closing_speed: f64) -> Optio
     if ball.escaping {
         return None;
     }
-    let boundary_limit = arena.radius - ball.radius;
-    let peg_limit = match (arena.peg_radius, ball.thickness) {
-        (Some(peg), Some(thickness)) => Some((ball.radius - thickness - peg).max(0.0)),
-        _ => None,
-    };
-    let (surface, limit, closing_speed) = match peg_limit {
-        Some(peg_limit) if peg_limit < boundary_limit => (Surface::Peg, peg_limit, 0.0),
-        _ => (Surface::Boundary, boundary_limit, closing_speed),
+    let limit = arena.room(ball.radius, ball.thickness);
+    // The room is the Boundary's unless the Peg leaves less.
+    let (surface, closing_speed) = if limit < arena.radius - ball.radius {
+        (Surface::Peg, 0.0)
+    } else {
+        (Surface::Boundary, closing_speed)
     };
     let dist = ball.pos.length();
     if dist < limit || dist == 0.0 {

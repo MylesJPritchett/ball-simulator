@@ -29,7 +29,7 @@ use serde::Deserialize;
 
 use super::{params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
-use crate::sim::{Ball, SettleEvent, SimState, Surface, Vec2};
+use crate::sim::{Arena, Ball, SettleEvent, SimState, Surface, Vec2};
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -81,23 +81,19 @@ impl Rule for Settle {
         else {
             return;
         };
-        let arena = state.arena.radius;
-        let peg = state.arena.peg_radius;
-        let surface = match peg {
-            None => Surface::Boundary,
-            Some(_) => Surface::Peg,
+        let stuck = |ball: &Ball| {
+            ball.thickness
+                .is_some_and(|thickness| is_stuck(&state.arena, ball.radius, thickness))
         };
-        // Exactly the fits the simulation clamps to.
-        let can_no_longer_move = |ball: &Ball| match (ball.thickness, peg) {
-            (None, _) => false,
-            (Some(_), None) => ball.radius >= arena,
-            (Some(thickness), Some(peg)) => ball.radius <= peg + thickness,
-        };
-        let Some(index) = state.balls_in_arena().position(can_no_longer_move) else {
+        let Some(index) = state.balls_in_arena().position(stuck) else {
             return;
         };
         let ring = state.balls.remove(index);
         let ring_thickness = ring.thickness.expect("only Rings settle");
+        let surface = match state.arena.peg_radius {
+            None => Surface::Boundary,
+            Some(_) => Surface::Peg,
+        };
         state.settles.push(SettleEvent {
             substep: ctx.substep + 1,
             colour: ring.colour,
@@ -105,27 +101,34 @@ impl Rule for Settle {
             radius: ring.radius,
             thickness: ring_thickness,
         });
-        let new_radius = match peg {
-            None => {
-                state.arena.radius = arena - ring_thickness;
-                if state.arena.radius <= radius {
-                    state.arena.solid = true;
-                    return;
-                }
+        let arena = &mut state.arena;
+        let new_radius = match surface {
+            Surface::Boundary => {
+                arena.radius -= ring_thickness;
                 radius
             }
-            Some(peg) => {
-                let peg = peg + ring_thickness;
-                state.arena.peg_radius = Some(peg);
-                if peg + thickness >= arena {
-                    state.arena.solid = true;
-                    return;
-                }
-                arena
+            Surface::Peg => {
+                *arena.peg_radius.as_mut().expect("round a Peg") += ring_thickness;
+                arena.radius
             }
         };
+        // Once a new Ring could not move either, the Arena is solid.
+        if is_stuck(arena, new_radius, thickness) {
+            arena.solid = true;
+            return;
+        }
         let dir = ctx.rng.range_f64(0.0, std::f64::consts::TAU);
         let new = state.spawn(Vec2::ZERO, Vec2::from_angle(dir) * speed, new_radius);
         state.balls[new].thickness = Some(thickness);
+    }
+}
+
+/// Whether a Ring this big and thick can no longer move: its radius has
+/// reached the Arena's or, round a Peg, its hole has reached the Peg. Exactly
+/// the fits the simulation clamps to.
+fn is_stuck(arena: &Arena, radius: f64, thickness: f64) -> bool {
+    match arena.peg_fit(thickness) {
+        Some(fit) => radius <= fit,
+        None => radius >= arena.radius,
     }
 }

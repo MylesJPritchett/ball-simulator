@@ -29,7 +29,7 @@ use serde::Deserialize;
 
 use super::{params, Rule, RuleContext};
 use crate::scenario::RuleSpec;
-use crate::sim::{Ball, Settle as Settled, SimState, Surface, Vec2};
+use crate::sim::{Ball, SettleEvent, SimState, Surface, Vec2};
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -78,7 +78,7 @@ impl Rule for Settle {
         };
         let ring = state.balls.remove(index);
         let ring_thickness = ring.thickness.expect("only Rings settle");
-        state.settles.push(Settled {
+        state.settles.push(SettleEvent {
             substep: ctx.substep + 1,
             colour: ring.colour,
             surface: match peg {

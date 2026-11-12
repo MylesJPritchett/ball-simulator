@@ -25,7 +25,7 @@ pub struct SimRecord {
     /// and including the freeze substep.
     pub boundary_hits: Vec<BoundaryHit>,
     /// Every Ring that settled (see the `settle` Rule), in order.
-    pub settles: Vec<Settle>,
+    pub settles: Vec<SettleEvent>,
     /// Ball count over time: one sample at substep 0 and one whenever it changes.
     pub ball_count: Vec<BallCountSample>,
     /// Which End Condition fired and when.
@@ -87,7 +87,7 @@ impl BoundaryHit {
 /// A Ring settling: it stopped moving and became part of the Arena, drawn as
 /// a layer where it was.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub struct Settle {
+pub struct SettleEvent {
     /// Substeps completed when it settled; time = substep / SUBSTEP_HZ.
     pub substep: u64,
     /// The Ring's palette colour index, which its layer keeps.
@@ -100,7 +100,7 @@ pub struct Settle {
     pub thickness: f64,
 }
 
-impl Settle {
+impl SettleEvent {
     pub fn time(&self) -> f64 {
         substep_to_seconds(self.substep)
     }

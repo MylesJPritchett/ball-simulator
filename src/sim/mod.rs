@@ -14,7 +14,9 @@ mod state;
 
 pub use ending::{Accent, Ending, EndingStyle, Finale, PlayOut};
 pub use quality_gate::{Rejection, Verdict};
-pub use record::{BallCountSample, BoundaryHit, EndEvent, Settle, SimRecord, SimStats, Surface};
+pub use record::{
+    BallCountSample, BoundaryHit, EndEvent, SettleEvent, SimRecord, SimStats, Surface,
+};
 pub use state::{Arena, Ball, Crack, Gap, Shatter, SimState, Vec2};
 
 use crate::audio::music::Sound;

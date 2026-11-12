@@ -5,7 +5,7 @@ use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
 use serde::Serialize;
 
-use super::record::Settle;
+use super::record::SettleEvent;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize)]
 pub struct Vec2 {
@@ -227,7 +227,7 @@ pub struct SimState {
     /// in the order they vanished.
     pub vanished: Vec<Ball>,
     /// Rings that have settled, in order (see the `settle` Rule).
-    pub settles: Vec<Settle>,
+    pub settles: Vec<SettleEvent>,
     /// Balls marked by [`SimState::vanish`] this substep, still in `balls`.
     vanishing: Vec<u32>,
     next_ball_id: u32,

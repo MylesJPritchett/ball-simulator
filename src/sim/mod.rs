@@ -452,6 +452,21 @@ fn hash_state(state: &SimState, substep: u64) -> u64 {
         feed(b.vel.x.to_bits());
         feed(b.vel.y.to_bits());
         feed(b.radius.to_bits());
+        // Only for Rings, so hashes without them are unchanged.
+        if let Some(thickness) = b.thickness {
+            feed(thickness.to_bits());
+        }
+    }
+    // Only once a Ring has settled, likewise.
+    if !state.settles.is_empty() {
+        feed(state.settles.len() as u64);
+        for settle in &state.settles {
+            feed(settle.substep);
+            feed(settle.colour as u64);
+            feed(settle.surface as u64);
+            feed(settle.radius.to_bits());
+            feed(settle.thickness.to_bits());
+        }
     }
     h
 }

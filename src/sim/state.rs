@@ -5,6 +5,8 @@ use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
 use serde::Serialize;
 
+use super::record::SettleEvent;
+
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize)]
 pub struct Vec2 {
     pub x: f64,
@@ -87,6 +89,12 @@ pub struct Arena {
     /// Set once the Boundary has shattered (see the `crack` Rule). It is then
     /// open all round, and drawn as shards flying out from where it broke.
     pub shatter: Option<Shatter>,
+    /// `Some` for an Arena with a Peg this big: a fixed solid disc at its
+    /// centre that a Ring's inner edge bounces off.
+    pub peg_radius: Option<f64>,
+    /// Set once Rings have settled into the Arena until there is no room for
+    /// another (see the `settle` Rule): what is left of it is drawn filled.
+    pub solid: bool,
 }
 
 /// An opening in the Boundary: the arc `width` radians wide centred on
@@ -124,7 +132,34 @@ impl Arena {
             gaps: Vec::new(),
             cracks: Vec::new(),
             shatter: None,
+            peg_radius: None,
+            solid: false,
         }
+    }
+
+    /// How far from the Arena's centre a ball this big (and, for a Ring, this
+    /// thick) can be: until its outer edge meets the Boundary or, for a Ring
+    /// round a Peg, its inner edge meets the Peg.
+    pub fn room(&self, radius: f64, thickness: Option<f64>) -> f64 {
+        let boundary = self.radius - radius;
+        match self.peg_room(radius, thickness) {
+            Some(peg) => boundary.min(peg),
+            None => boundary,
+        }
+    }
+
+    /// How far from the Arena's centre a Ring this big and thick can be
+    /// before its inner edge meets the Peg. `None` without a Peg, or for a
+    /// solid ball.
+    pub fn peg_room(&self, radius: f64, thickness: Option<f64>) -> Option<f64> {
+        let hole = radius - thickness?;
+        Some((hole - self.peg_radius?).max(0.0))
+    }
+
+    /// The radius at which a Ring this thick fits the Peg exactly (its hole
+    /// is the Peg's size): the smallest it can be. `None` without a Peg.
+    pub fn peg_fit(&self, thickness: f64) -> Option<f64> {
+        self.peg_radius.map(|peg| peg + thickness)
     }
 
     /// Whether the Boundary is open (in a Gap) at `angle`.
@@ -191,6 +226,19 @@ pub struct Ball {
     /// is on its way out. The Boundary no longer holds it and forces no
     /// longer act on it, so it flies straight out.
     pub escaping: bool,
+    /// `Some` for a Ring: how thick it is (its hole's radius is `radius`
+    /// minus this). It stays the same when the radius changes. Without a Peg
+    /// the hole is only how a Ring looks; it moves like a solid ball.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thickness: Option<f64>,
+}
+
+impl Ball {
+    /// For a Ring, the radius of its hole: its radius less its thickness.
+    /// `None` for a solid ball.
+    pub fn hole_radius(&self) -> Option<f64> {
+        Some(self.radius - self.thickness?)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -200,6 +248,8 @@ pub struct SimState {
     /// Balls that have vanished from the Arena, as they were just before,
     /// in the order they vanished.
     pub vanished: Vec<Ball>,
+    /// Rings that have settled, in order (see the `settle` Rule).
+    pub settles: Vec<SettleEvent>,
     /// Balls marked by [`SimState::vanish`] this substep, still in `balls`.
     vanishing: Vec<u32>,
     next_ball_id: u32,
@@ -211,6 +261,7 @@ impl SimState {
             arena,
             balls: Vec::new(),
             vanished: Vec::new(),
+            settles: Vec::new(),
             vanishing: Vec::new(),
             next_ball_id: 0,
         }
@@ -239,14 +290,19 @@ impl SimState {
     }
 
     /// Keeps every ball inside the Arena after Rules have changed radii: a
-    /// ball is never larger than the Arena, and one poking past the Boundary
-    /// is moved straight inward until it touches it. Velocity is unchanged.
+    /// ball is never larger than the Arena, a Ring round a Peg never has a
+    /// hole smaller than the Peg, and one poking past the Boundary (or a Ring
+    /// whose inner edge overlaps the Peg) is moved straight inward until it
+    /// touches it. Velocity is unchanged.
     /// Escaping balls are left to carry on out.
     pub fn contain(&mut self) {
-        let arena_radius = self.arena.radius;
-        for ball in self.balls_in_arena_mut() {
-            ball.radius = ball.radius.min(arena_radius);
-            let limit = arena_radius - ball.radius;
+        let SimState { arena, balls, .. } = self;
+        for ball in balls.iter_mut().filter(|ball| !ball.escaping) {
+            if let Some(fit) = ball.thickness.and_then(|t| arena.peg_fit(t)) {
+                ball.radius = ball.radius.max(fit);
+            }
+            ball.radius = ball.radius.min(arena.radius);
+            let limit = arena.room(ball.radius, ball.thickness);
             let dist = ball.pos.length();
             // The tolerance leaves balls that Boundary resolution already
             // placed on the Boundary untouched (bit for bit).
@@ -287,6 +343,7 @@ impl SimState {
             radius,
             colour: 0,
             escaping: false,
+            thickness: None,
         });
         self.balls.len() - 1
     }

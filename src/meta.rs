@@ -72,8 +72,9 @@ const DEFAULT_TITLE: &str = "{hook_title}";
 /// `population_cap`, `rules[0].percent`, `hook_title`, ...), resolved for the
 /// Seed, plus `seed`, `palette`, `instrument`, `scale`, `boundary_hits`
 /// (every Boundary Hit on screen, including those during the Play-out),
-/// `balls` (final ball count) and `duration` (Video length in whole seconds,
-/// including the Play-out and the hold).
+/// `balls` (final ball count), `rings_settled` (Rings that settled) and
+/// `duration` (Video length in whole seconds, including the Play-out and the
+/// hold).
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetaSpec {
@@ -94,6 +95,7 @@ const RECORD_VARS: &[&str] = &[
     "scale",
     "boundary_hits",
     "balls",
+    "rings_settled",
     "duration",
 ];
 
@@ -108,6 +110,7 @@ fn template_vars(
         record.sound.scale.name().to_string(),
         record.boundary_hits.len().to_string(),
         record.final_balls.len().to_string(),
+        record.settles.len().to_string(),
         (record.ending.cut_time().round() as u64).to_string(),
     ];
     vars.extend(RECORD_VARS.iter().map(|k| k.to_string()).zip(values));

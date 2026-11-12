@@ -5,11 +5,12 @@
 //! anything that drives a `Simulation` frame by frame (the encoder, a preview
 //! window) gets identical frames, the Ending's flash and Finale included.
 //!
-//! Draw order: background, fading trails, Boundary (with its cracks), hit
-//! glows, balls, the Ending's Finale (e.g. a pop), Hook Title, Counter, then
-//! the Ending's flash over everything; a Meltdown breaks the finished frame
-//! down last. Trails and glows are clipped to the Arena (Boundary included).
-//! With Heat on, the Heat field takes the place of trails and balls.
+//! Draw order: background, fading trails, Boundary (with its cracks), Peg,
+//! hit glows, settled layers, balls, the Ending's Finale (e.g. a pop), Hook
+//! Title, Counter, then the Ending's flash over everything; a Meltdown breaks
+//! the finished frame down last. Trails and glows are clipped to the Arena
+//! (Boundary included). With Heat on, the Heat field takes the place of
+//! trails and balls.
 
 mod heat;
 mod meltdown;
@@ -25,12 +26,15 @@ use crate::layout;
 use crate::look::palette::{Palette, Rgb};
 use crate::look::{Counter, LookSpec};
 use crate::scenario::Scenario;
-use crate::sim::{Ball, Ending, Finale, Simulation, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
+use crate::sim::{Ball, Ending, Finale, Simulation, Surface, SUBSTEPS_PER_FRAME, SUBSTEP_HZ};
 use heat::Heat;
 use meltdown::Meltdown;
 use text::{FittedText, TextPainter};
 
 const BOUNDARY_WIDTH: f32 = 6.0;
+/// How far the Boundary's colour is mixed towards the background when there
+/// is a Peg, so it reads as a faint target outline.
+const TARGET_OUTLINE_FADE: f32 = 0.75;
 /// Angle (radians) between the points of a Boundary arc drawn around a Gap:
 /// half a degree strays well under a pixel from the true circle.
 const BOUNDARY_ARC_STEP: f64 = std::f64::consts::PI / 360.0;
@@ -211,9 +215,11 @@ impl Renderer {
             self.draw_trails(sim, palette);
         }
         self.draw_boundary(sim, palette);
+        self.draw_peg(sim, palette);
         if self.glow {
             self.draw_glows(sim, palette, now);
         }
+        self.draw_layers(sim, palette);
         if self.heat.is_none() {
             self.draw_balls(sim, palette);
         }
@@ -326,11 +332,25 @@ impl Renderer {
         sim.state().arena.radius as f32 * self.scale
     }
 
+    /// Where the Boundary is drawn (px): on the Arena's edge, or round the
+    /// outermost settled layer once Rings have settled into it, so it does
+    /// not move when one does.
+    fn boundary_stroke_radius(&self, sim: &Simulation) -> f32 {
+        let state = sim.state();
+        let outer = state
+            .settles
+            .iter()
+            .filter(|settle| settle.surface == Surface::Boundary)
+            .map(|settle| settle.radius)
+            .fold(state.arena.radius, f64::max);
+        outer as f32 * self.scale
+    }
+
     /// The Boundary, with any Gaps left out, and its cracks; once it has
     /// shattered, its shards (cracks and all) flying outward.
     fn draw_boundary(&mut self, sim: &Simulation, palette: &Palette) {
         let centre = (self.arena.center_x, self.arena.center_y);
-        let inner = self.boundary_radius(sim);
+        let inner = self.boundary_stroke_radius(sim);
         let r = inner + BOUNDARY_WIDTH / 2.0;
         let arena = &sim.state().arena;
         let shards = arena.shatter.map(|shatter| {
@@ -360,7 +380,12 @@ impl Renderer {
             anti_alias: true,
             ..Paint::default()
         };
-        paint.set_color(rgb(palette.boundary));
+        // With a Peg, the Boundary is the faint outline the Peg grows towards.
+        let colour = match arena.peg_radius {
+            Some(_) => mix(palette.boundary, palette.background, TARGET_OUTLINE_FADE),
+            None => palette.boundary,
+        };
+        paint.set_color(rgb(colour));
         if let Some(path) = path {
             let stroke = Stroke {
                 width: BOUNDARY_WIDTH,
@@ -407,12 +432,36 @@ impl Renderer {
         }
     }
 
-    /// A soft glow on the Boundary where each recent Boundary Hit landed, in
-    /// the hitting ball's colour, fading out over [`GLOW_SUBSTEPS`] of render
-    /// time (`now`). Hits close to a newer one share its glow, and glows are
-    /// clipped to the Arena.
+    /// The Peg, if there is one: a solid disc at the Arena's centre in the
+    /// Boundary's colour.
+    fn draw_peg(&mut self, sim: &Simulation, palette: &Palette) {
+        let Some(peg) = sim.state().arena.peg_radius else {
+            return;
+        };
+        let (x, y) = (self.arena.center_x, self.arena.center_y);
+        if let Some(disc) = PathBuilder::from_circle(x, y, peg as f32 * self.scale) {
+            let mut paint = Paint {
+                anti_alias: true,
+                ..Paint::default()
+            };
+            paint.set_color(rgb(palette.boundary));
+            self.pixmap.fill_path(
+                &disc,
+                &paint,
+                FillRule::Winding,
+                Transform::identity(),
+                None,
+            );
+        }
+    }
+
+    /// A soft glow on the Boundary (or the Peg) where each recent Boundary
+    /// Hit landed, in the hitting ball's colour, fading out over
+    /// [`GLOW_SUBSTEPS`] of render time (`now`). Hits close to a newer one
+    /// share its glow, and glows are clipped to the Arena.
     fn draw_glows(&mut self, sim: &Simulation, palette: &Palette, now: u64) {
         let boundary = self.boundary_radius(sim) + BOUNDARY_WIDTH / 2.0;
+        let peg = sim.state().arena.peg_radius.unwrap_or(0.0) as f32 * self.scale;
         let balls = &sim.state().balls;
         let mut glows: Vec<(&crate::sim::BoundaryHit, f32, f32)> = Vec::new();
         for hit in sim
@@ -423,8 +472,12 @@ impl Renderer {
             .take(MAX_GLOW_CANDIDATES)
         {
             let (sin, cos) = (hit.angle as f32).sin_cos();
-            let x = self.arena.center_x + cos * boundary;
-            let y = self.arena.center_y + sin * boundary;
+            let r = match hit.surface {
+                Surface::Boundary => boundary,
+                Surface::Peg => peg,
+            };
+            let x = self.arena.center_x + cos * r;
+            let y = self.arena.center_y + sin * r;
             let near_newer = glows
                 .iter()
                 .any(|&(_, gx, gy)| (gx - x).hypot(gy - y) < GLOW_MERGE_PX);
@@ -484,6 +537,48 @@ impl Renderer {
         }
     }
 
+    /// Each settled Ring as a concentric annulus in its colour, where it was
+    /// as it settled, so nothing moves when one settles; layers settled onto
+    /// the Peg cover it, so it reads as its layers on its starting colour.
+    /// Once the Arena is solid, what is left of it (round the Peg, if there
+    /// is one) is filled in the last layer's colour.
+    fn draw_layers(&mut self, sim: &Simulation, palette: &Palette) {
+        let state = sim.state();
+        let (x, y) = self.to_screen(0.0, 0.0);
+        let mut paint = Paint {
+            anti_alias: true,
+            ..Paint::default()
+        };
+        for settle in &state.settles {
+            paint.set_color(rgb(palette.ball(settle.colour as usize)));
+            let outer = settle.radius as f32 * self.scale;
+            let hole = (settle.radius - settle.thickness) as f32 * self.scale;
+            self.fill_annulus(&paint, (x, y), outer, Some(hole));
+        }
+        if let (true, Some(last)) = (state.arena.solid, state.settles.last()) {
+            paint.set_color(rgb(palette.ball(last.colour as usize)));
+            let peg = state.arena.peg_radius.map(|peg| peg as f32 * self.scale);
+            self.fill_annulus(&paint, (x, y), self.boundary_radius(sim), peg);
+        }
+    }
+
+    /// Fills the disc of radius `outer` (pixels) centred on `centre`, less
+    /// the concentric `hole` if there is one, so the background shows
+    /// through it.
+    fn fill_annulus(&mut self, paint: &Paint, centre: (f32, f32), outer: f32, hole: Option<f32>) {
+        let (x, y) = centre;
+        let mut pb = PathBuilder::new();
+        pb.push_circle(x, y, outer);
+        if let Some(hole) = hole.filter(|&hole| hole > 0.0) {
+            pb.push_circle(x, y, hole);
+        }
+        if let Some(path) = pb.finish() {
+            // The even-odd rule leaves the hole unfilled.
+            self.pixmap
+                .fill_path(&path, paint, FillRule::EvenOdd, Transform::identity(), None);
+        }
+    }
+
     fn draw_balls(&mut self, sim: &Simulation, palette: &Palette) {
         let mut paint = Paint {
             anti_alias: true,
@@ -492,15 +587,9 @@ impl Renderer {
         for ball in &sim.state().balls {
             let (x, y) = self.to_screen(ball.pos.x, ball.pos.y);
             paint.shader = Shader::SolidColor(rgb(palette.ball(ball_slot(ball))));
-            if let Some(circle) = PathBuilder::from_circle(x, y, ball.radius as f32 * self.scale) {
-                self.pixmap.fill_path(
-                    &circle,
-                    &paint,
-                    FillRule::Winding,
-                    Transform::identity(),
-                    None,
-                );
-            }
+            // A Ring is an annulus round its hole.
+            let hole = ball.hole_radius().map(|hole| hole as f32 * self.scale);
+            self.fill_annulus(&paint, (x, y), ball.radius as f32 * self.scale, hole);
         }
     }
 

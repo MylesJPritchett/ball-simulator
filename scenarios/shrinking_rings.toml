@@ -1,0 +1,55 @@
+# Every bounce it shrinks: a Ring as big as the Arena shrinks on every Boundary
+# Hit (and every hit on the Peg at the centre) until its hole fits the Peg.
+# There it settles onto the Peg as a layer in its own colour and a new Ring
+# starts at full size, until the Peg fills the faint outline of the Arena as a
+# solid disc of concentric layers.
+
+name = "Shrinking Rings"
+hook_title = "Every bounce it shrinks"
+# Safety net only: a Ring stuck skimming without settling is rejected.
+time_cap = 60.0
+
+[arena]
+radius = 460.0
+peg_radius = 110.0
+
+# Every Ring after the first starts with its outer edge on the Boundary; the
+# first starts just inside it, as validation needs a ball smaller than the
+# Arena, so it too opens with a Boundary Hit straight away.
+[ball]
+radius = 458.0
+thickness = { min = 14.0, max = 23.0 }
+speed = 750.0
+
+[[rules]]
+kind = "shrink"
+amount = { min = 12.0, max = 13.5 }
+
+[[rules]]
+kind = "settle"
+
+[[rules]]
+kind = "change_colour"
+
+# Every hit, on the Boundary or the Peg, plays a note.
+[[rules]]
+kind = "play_note"
+
+# The Terminal State: the Peg has grown until no Ring can move round it.
+[end_condition]
+kind = "solid"
+
+[look]
+counter = "rings_settled"
+
+# Seeds outside these are rejected and replaced. Durations are Video length
+# in seconds (action plus the ~1.5 s ending hold).
+[quality_gate]
+min_duration = 25.0
+max_duration = 55.0
+min_boundary_hits = 60
+
+[meta]
+title = "Every bounce it shrinks - {rings_settled} Rings until it is solid"
+description = "A Ring as big as the Arena shrinks {rules[0].amount} units on every hit until it fits the Peg and settles onto it. {rings_settled} Rings and {boundary_hits} bounces fill the Arena."
+hashtags = ["rings", "shrinking", "satisfying", "fill"]

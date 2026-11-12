@@ -679,3 +679,330 @@ fn the_boundary_is_drawn_shattered_once_the_ball_breaks_out() {
     });
     assert!(checked > 60, "{checked} frames checked");
 }
+
+#[test]
+fn a_ring_draws_as_an_annulus_with_the_background_in_its_hole() {
+    // A big Ring (hole radius 120) on frame 0, before it has moved; no trails
+    // or glows to tint it.
+    let toml = MINIMAL
+        .replace("radius = 30.0", "radius = 200.0")
+        .replace("speed = 900.0", "speed = 900.0\nthickness = 80.0")
+        + "\n[look]\ntrails = false\nglow = false\n";
+    let arena = layout::arena();
+    let scale = arena.radius / 460.0;
+    let mut drawn = false;
+    draw_frames(&toml, 1, 1, |sim, frame| {
+        let ball = &sim.state().balls[0];
+        let colour = sim.palette().ball(0);
+        let background = sim.palette().background;
+        let centre = (
+            arena.center_x + ball.pos.x as f32 * scale,
+            arena.center_y + ball.pos.y as f32 * scale,
+        );
+        for step in 0..36 {
+            let (sin, cos) = (step as f32 * 10.0).to_radians().sin_cos();
+            let at = |r: f32| (centre.0 + cos * r * scale, centre.1 + sin * r * scale);
+            // Through the hole, up to near its edge.
+            for r in [0.0, 60.0, 110.0] {
+                let (x, y) = at(r);
+                assert_eq!(
+                    pixel(frame, x, y),
+                    background,
+                    "hole at r {r}: {x:.0},{y:.0}"
+                );
+            }
+            // The middle of the band.
+            let (x, y) = at(160.0);
+            assert_eq!(pixel(frame, x, y), colour, "band at {x:.0},{y:.0}");
+        }
+        drawn = true;
+    });
+    assert!(drawn);
+}
+
+/// MINIMAL round a Peg of 100: a Ring 200 in radius and 20 thick, with no
+/// trails or glows to tint anything.
+fn round_a_peg() -> String {
+    MINIMAL
+        .replace("radius = 460.0", "radius = 460.0\npeg_radius = 100.0")
+        .replace("radius = 30.0", "radius = 200.0")
+        .replace("speed = 900.0", "speed = 900.0\nthickness = 20.0")
+        + "\n[look]\ntrails = false\nglow = false\n"
+}
+
+#[test]
+fn the_peg_is_drawn_as_a_solid_disc_in_its_colour() {
+    let arena = layout::arena();
+    let scale = arena.radius / 460.0;
+    let mut frames = 0;
+    draw_frames(&round_a_peg(), 1, 60, |sim, frame| {
+        let peg = sim.palette().boundary;
+        for step in 0..36 {
+            let (sin, cos) = (step as f32 * 10.0).to_radians().sin_cos();
+            // Through the disc, up to near its edge.
+            for r in [0.0, 50.0, 95.0] {
+                let (x, y) = (
+                    arena.center_x + cos * r * scale,
+                    arena.center_y + sin * r * scale,
+                );
+                assert_eq!(pixel(frame, x, y), peg, "Peg at r {r}: {x:.0},{y:.0}");
+            }
+        }
+        frames += 1;
+    });
+    assert_eq!(frames, 60);
+}
+
+/// The colours drawn on the middle of the Boundary stroke all round, on
+/// frame 0.
+fn boundary_colours(toml: &str) -> Vec<[u8; 3]> {
+    let arena = layout::arena();
+    let r = arena.radius + BOUNDARY_WIDTH / 2.0;
+    let mut colours = Vec::new();
+    draw_frames(toml, 1, 1, |_, frame| {
+        for step in 0..360 {
+            let (sin, cos) = (step as f32).to_radians().sin_cos();
+            colours.push(pixel(
+                frame,
+                arena.center_x + cos * r,
+                arena.center_y + sin * r,
+            ));
+        }
+    });
+    colours.sort();
+    colours.dedup();
+    colours
+}
+
+#[test]
+fn with_a_peg_the_boundary_is_a_faint_target_outline() {
+    let plain = MINIMAL.to_string() + "\n[look]\ntrails = false\nglow = false\n";
+    let scenario = scenario(&plain);
+    let palette = sim::Simulation::new(&scenario, 1).palette();
+
+    assert_eq!(
+        boundary_colours(&plain),
+        vec![palette.boundary],
+        "unchanged"
+    );
+    let faint = boundary_colours(&round_a_peg());
+    assert_eq!(faint.len(), 1, "one colour all round: {faint:?}");
+    let faint = faint[0];
+    assert!(
+        brightness(faint) > brightness(palette.background) + 30
+            && brightness(faint) < brightness(palette.boundary) / 2,
+        "faint: {faint:?}, Boundary {:?}, background {:?}",
+        palette.boundary,
+        palette.background
+    );
+}
+
+#[test]
+fn a_peg_hit_glows_on_the_peg_not_the_boundary() {
+    // Every hit is on the Peg; drawn with and without glows, the frames
+    // differ only round the Peg (its 100 units plus a fading glow's reach).
+    let arena = layout::arena();
+    let scale = arena.radius / 460.0;
+    let reach = 100.0 * scale + 100.0 * 1.6 + 2.0;
+    let frames = |glow: bool| {
+        let toml = round_a_peg().replace("glow = false", &format!("glow = {glow}"));
+        let mut out = Vec::new();
+        draw_frames(&toml, 1, 60, |_, frame| out.push(frame.to_vec()));
+        out
+    };
+    let (glowing, plain) = (frames(true), frames(false));
+    let mut differing = 0;
+    for (k, (a, b)) in glowing.iter().zip(&plain).enumerate() {
+        for y in 0..layout::HEIGHT as usize {
+            for x in 0..layout::WIDTH as usize {
+                let i = (y * layout::WIDTH as usize + x) * 4;
+                if a[i..i + 3] != b[i..i + 3] {
+                    let d = (x as f32 - arena.center_x).hypot(y as f32 - arena.center_y);
+                    assert!(d < reach, "frame {k}: glow at {x},{y}, {d:.0} px out");
+                    differing += 1;
+                }
+            }
+        }
+    }
+    assert!(differing > 0, "the Peg hits glow");
+}
+
+/// A Ring (radius 60, thickness 50) that grows by 200 on every Boundary Hit
+/// and settles in two hits a cycle: eight layers, 460 to 60, then solid. It
+/// changes colour on every hit, so neighbouring layers differ.
+fn settling() -> String {
+    MINIMAL
+        .replace("time_cap = 5.0", "time_cap = 60.0")
+        .replace("radius = 30.0", "radius = 60.0")
+        .replace("speed = 900.0", "speed = 3000.0\nthickness = 50.0")
+        + "\n[[rules]]\nkind = \"grow\"\namount = 200.0\n\
+           \n[[rules]]\nkind = \"change_colour\"\n\
+           \n[[rules]]\nkind = \"settle\"\n\
+           \n[look]\ntrails = false\nglow = false\n\
+           \n[end_condition]\nkind = \"solid\"\n"
+}
+
+/// Pixel at `r` sim units from the Arena's centre, at `degrees`.
+fn at_radius(frame: &[u8], r: f64, degrees: f32) -> [u8; 3] {
+    let arena = layout::arena();
+    let scale = arena.radius / 460.0;
+    let (sin, cos) = degrees.to_radians().sin_cos();
+    let r = r as f32 * scale;
+    pixel(frame, arena.center_x + cos * r, arena.center_y + sin * r)
+}
+
+#[test]
+fn settled_layers_are_drawn_in_their_colours_inside_a_boundary_that_stays_put() {
+    let toml = settling();
+    let record = sim::run(&scenario(&toml), 1);
+    assert_eq!(record.settles.len(), 8);
+    let boundary_ring = layout::arena().radius + BOUNDARY_WIDTH / 2.0;
+    let mut checked = 0;
+    // No flash, which would tint the layers at the Ending.
+    let no_flash = |ending: Ending| Ending {
+        flash_substeps: 0,
+        ..ending
+    };
+    draw_frames_with(&toml, 1, record.ending.frames(), no_flash, |sim, frame| {
+        let palette = sim.palette();
+        for step in 0..36 {
+            let degrees = step as f32 * 10.0;
+            let (sin, cos) = degrees.to_radians().sin_cos();
+            let arena = layout::arena();
+            let (x, y) = (
+                arena.center_x + cos * boundary_ring,
+                arena.center_y + sin * boundary_ring,
+            );
+            assert_eq!(pixel(frame, x, y), palette.boundary, "the Boundary stays");
+            for settle in &sim.state().settles {
+                let mid = settle.radius - settle.thickness / 2.0;
+                assert_eq!(
+                    at_radius(frame, mid, degrees),
+                    palette.ball(settle.colour as usize),
+                    "layer at {} in its colour",
+                    settle.radius
+                );
+            }
+        }
+        checked += sim.state().settles.len();
+    });
+    assert!(checked > 8, "{checked} layers checked");
+}
+
+#[test]
+fn a_solid_arena_is_filled_to_the_centre_and_the_flash_covers_the_whole_disc() {
+    let toml = settling();
+    let record = sim::run(&scenario(&toml), 1);
+    let fired = (record.end.substep / SUBSTEPS_PER_FRAME + 1) as usize;
+    let mut frames = Vec::new();
+    let mut colours = None;
+    draw_frames(&toml, 1, record.ending.frames(), |sim, frame| {
+        frames.push(frame.to_vec());
+        let last = sim.state().settles.last().map(|s| s.colour as usize);
+        colours = Some((
+            sim.palette().ball(last.unwrap_or(0)),
+            sim.palette().background,
+        ));
+    });
+    let (last_layer, background) = colours.unwrap();
+    let held = frames.last().unwrap();
+    let flashed = &frames[fired];
+    // From the centre out to the Arena's edge, through every layer.
+    for r in (0..46).map(|k| k as f64 * 10.0) {
+        for step in 0..12 {
+            let degrees = step as f32 * 30.0;
+            let after = at_radius(held, r, degrees);
+            assert_ne!(after, background, "solid at r {r}");
+            if r < 60.0 {
+                assert_eq!(after, last_layer, "the centre is filled at r {r}");
+            }
+            let bright = |c: [u8; 3]| c.map(u32::from).iter().sum::<u32>();
+            assert!(
+                bright(at_radius(flashed, r, degrees)) > bright(after),
+                "the flash covers r {r} at {degrees}"
+            );
+        }
+    }
+}
+
+/// A Ring (radius 450, thickness 50) round a Peg of 100 that shrinks by 200
+/// on every Boundary Hit and settles onto the Peg: it grows to 150, 200, ...,
+/// 450, where one more thickness reaches the 460 Boundary, so the Arena is
+/// solid after seven layers. It changes colour on every hit, so neighbouring
+/// layers differ.
+fn settling_onto_a_peg() -> String {
+    MINIMAL
+        .replace("time_cap = 5.0", "time_cap = 60.0")
+        .replace("radius = 460.0", "radius = 460.0\npeg_radius = 100.0")
+        .replace("radius = 30.0", "radius = 450.0")
+        .replace("speed = 900.0", "speed = 3000.0\nthickness = 50.0")
+        + "\n[[rules]]\nkind = \"shrink\"\namount = 200.0\n\
+           \n[[rules]]\nkind = \"change_colour\"\n\
+           \n[[rules]]\nkind = \"settle\"\n\
+           \n[look]\ntrails = false\nglow = false\n\
+           \n[end_condition]\nkind = \"solid\"\n"
+}
+
+#[test]
+fn the_peg_is_drawn_as_its_settled_layers_on_its_starting_colour() {
+    let toml = settling_onto_a_peg();
+    let record = sim::run(&scenario(&toml), 1);
+    assert_eq!(record.settles.len(), 7);
+    let no_flash = |ending: Ending| Ending {
+        flash_substeps: 0,
+        ..ending
+    };
+    let mut checked = 0;
+    draw_frames_with(&toml, 1, record.ending.frames(), no_flash, |sim, frame| {
+        let palette = sim.palette();
+        for step in 0..36 {
+            let degrees = step as f32 * 10.0;
+            for r in [0.0, 50.0, 95.0] {
+                assert_eq!(
+                    at_radius(frame, r, degrees),
+                    palette.boundary,
+                    "the Peg as it started at r {r}"
+                );
+            }
+            for settle in &sim.state().settles {
+                assert_eq!(
+                    at_radius(frame, settle.radius - settle.thickness / 2.0, degrees),
+                    palette.ball(settle.colour as usize),
+                    "layer out to {} in its colour",
+                    settle.radius
+                );
+            }
+        }
+        checked += sim.state().settles.len();
+    });
+    assert!(checked > 7, "{checked} layers checked");
+}
+
+#[test]
+fn at_the_ending_the_peg_fills_the_outline_and_the_flash_covers_it() {
+    let toml = settling_onto_a_peg();
+    let record = sim::run(&scenario(&toml), 1);
+    let fired = (record.end.substep / SUBSTEPS_PER_FRAME + 1) as usize;
+    let mut frames = Vec::new();
+    let mut last_layer = None;
+    draw_frames(&toml, 1, record.ending.frames(), |sim, frame| {
+        frames.push(frame.to_vec());
+        let last = sim.state().settles.last().map(|s| s.colour as usize);
+        last_layer = Some(sim.palette().ball(last.unwrap_or(0)));
+    });
+    let last_layer = last_layer.unwrap();
+    let held = frames.last().unwrap();
+    let flashed = &frames[fired];
+    let bright = |c: [u8; 3]| c.map(u32::from).iter().sum::<u32>();
+    for step in 0..12 {
+        let degrees = step as f32 * 30.0;
+        // Between the last layer (out to 450) and the 460 outline.
+        assert_eq!(at_radius(held, 455.0, degrees), last_layer, "filled");
+        for r in (0..46).map(|k| k as f64 * 10.0).chain([455.0]) {
+            assert!(
+                bright(at_radius(flashed, r, degrees)) > bright(at_radius(held, r, degrees)),
+                "the flash covers r {r} at {degrees}"
+            );
+        }
+    }
+}

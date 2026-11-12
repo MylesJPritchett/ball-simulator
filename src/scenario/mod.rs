@@ -89,6 +89,10 @@ pub struct Scenario {
 pub struct ArenaSpec {
     /// Arena radius in simulation units. Render scales the Arena to fit the layout.
     pub radius: f64,
+    /// Present puts a Peg this big at the Arena's centre: a fixed solid disc
+    /// the ball (which must be a Ring) moves around.
+    #[serde(default)]
+    pub peg_radius: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -100,6 +104,10 @@ pub struct BallSpec {
     /// Speed limit in units per second, always enforced on every ball.
     #[serde(default = "default_max_speed")]
     pub max_speed: f64,
+    /// Present makes the ball a Ring this thick: its hole's radius is its
+    /// radius minus its thickness. Must be less than the radius.
+    #[serde(default)]
+    pub thickness: Option<f64>,
 }
 
 /// Max speed for Scenarios that don't set one.
@@ -169,6 +177,20 @@ impl Scenario {
             return Err(
                 lowest.invalid("ball.radius must be smaller than arena.radius across their ranges")
             );
+        }
+        if let Some(thickness) = highest.ball.thickness {
+            if thickness >= lowest.ball.radius {
+                return Err(lowest
+                    .invalid("ball.thickness must be less than ball.radius across their ranges"));
+            }
+            if let Some(peg) = highest.arena.peg_radius {
+                if peg >= lowest.ball.radius - thickness {
+                    return Err(lowest.invalid(
+                        "arena.peg_radius must be smaller than the Ring's hole \
+                         (ball.radius - ball.thickness) across their ranges",
+                    ));
+                }
+            }
         }
         Ok(Scenario { raw, ..lowest })
     }
@@ -256,6 +278,31 @@ impl Scenario {
             return Err(
                 self.invalid("ball.radius must be greater than 0 and smaller than arena.radius")
             );
+        }
+        if let Some(thickness) = self.ball.thickness {
+            if !(thickness.is_finite() && thickness > 0.0 && thickness < self.ball.radius) {
+                return Err(
+                    self.invalid("ball.thickness must be greater than 0 and less than ball.radius")
+                );
+            }
+        }
+        if let Some(peg) = self.arena.peg_radius {
+            if !(peg.is_finite() && peg > 0.0) {
+                return Err(self.invalid("arena.peg_radius must be greater than 0 and finite"));
+            }
+            // Solid balls hitting a Peg are not modelled.
+            let Some(thickness) = self.ball.thickness else {
+                return Err(self.invalid(
+                    "arena.peg_radius needs a Ring ball (set ball.thickness): \
+                     only a Ring's inner edge bounces off a Peg",
+                ));
+            };
+            if peg >= self.ball.radius - thickness {
+                return Err(self.invalid(
+                    "arena.peg_radius must be smaller than the Ring's hole \
+                     (ball.radius - ball.thickness)",
+                ));
+            }
         }
         self.look.validate().map_err(|m| self.invalid(m))?;
         crate::meta::check_templates(self).map_err(|m| self.invalid(m))?;

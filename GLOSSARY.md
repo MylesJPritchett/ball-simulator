@@ -48,7 +48,7 @@ The short premise shown above the Arena and used as the Video's title (e.g. "Eve
 How many balls overlap at a point in the Arena, shown as colour that reaches white-hot at the Population Cap.
 
 **Counter**:
-The live number shown below the Arena (ball count, Boundary Hit count, or speed), chosen by the Scenario.
+The live number shown below the Arena (ball count, Boundary Hit count, speed, or Rings settled), chosen by the Scenario.
 
 **Quality Gate**:
 A headless dry run of a Seed that rejects it if the resulting Video would be dull (ends too soon, never ends, too few Boundary Hits).
@@ -78,8 +78,20 @@ The Boundary breaking all the way round at the first Boundary Hit at max speed: 
 **Escape**:
 A ball passing out through an opening a Rule made in the Boundary (such as a Gap). An escaping ball is no longer held by the Boundary or pulled by gravity and drag, so it flies straight out of the frame.
 
+**Ring**:
+A ball with a hollow centre, given by its thickness: its hole's radius is its radius minus its thickness, and the thickness stays the same as the ball grows or shrinks. Its outer edge bounces off the Boundary; on its own the hole is only how it looks, so it moves exactly like a solid ball of the same radius.
+_Avoid_: Hoop, donut, hollow ball
+
+**Peg**:
+A fixed solid disc at the centre of the Arena that a Ring moves around: the Ring's inner edge bounces off it as its outer edge bounces off the Boundary. Only a Ring can be in an Arena with a Peg.
+_Avoid_: Post, hub, core
+
+**Settle**:
+What a Ring that can no longer move does. Once it has grown to fill the Arena (which forces it concentric) it settles into the Boundary: it stops being a ball and becomes the new Boundary, a layer of the Arena in its own colour, so the Arena shrinks by the Ring's thickness and a new Ring starts at the centre. Round a Peg, once it has shrunk until its hole fits the Peg (which also forces it concentric) it settles onto the Peg instead: it becomes a layer of the Peg in its own colour, so the Peg grows by the Ring's thickness and a new Ring starts with its outer edge on the Boundary. When the Arena is too small for another Ring, or the Peg too big for one to move round it, the Arena is **solid**, a Terminal State.
+_Avoid_: Lock in, freeze, stick
+
 **Boundary Hit**:
-A ball touching the Boundary; the default trigger for sounds and on-hit Rules. Balls pass through each other unless a Rule says otherwise.
+A ball touching the Boundary or a Peg; the default trigger for sounds and on-hit Rules, which treat both alike. A hit says which surface it was on and where on that surface it landed. Balls pass through each other unless a Rule says otherwise.
 _Avoid_: Collision, bounce, edge hit
 
 ### Audio

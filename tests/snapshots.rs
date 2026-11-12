@@ -171,6 +171,20 @@ fn growing_seed_1() {
 }
 
 #[test]
+fn growing_rings_seed_1() {
+    assert_seed_1(
+        "growing_rings",
+        Snapshot {
+            boundary_hits: 476,
+            final_ball_count: 0,
+            end_condition: "solid",
+            end_substep: 16883,
+            final_state_hash: 14733856739632147521,
+        },
+    );
+}
+
+#[test]
 fn shrinking_seed_1() {
     assert_seed_1(
         "shrinking",
@@ -194,6 +208,20 @@ fn shrinking_arena_seed_1() {
             end_condition: "arena_filled",
             end_substep: 18032,
             final_state_hash: 14872965655936800902,
+        },
+    );
+}
+
+#[test]
+fn shrinking_rings_seed_1() {
+    assert_seed_1(
+        "shrinking_rings",
+        Snapshot {
+            boundary_hits: 231,
+            final_ball_count: 0,
+            end_condition: "solid",
+            end_substep: 15319,
+            final_state_hash: 18347527339010434954,
         },
     );
 }

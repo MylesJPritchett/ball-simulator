@@ -15,6 +15,7 @@ mod gap;
 mod gravity;
 mod grow;
 mod play_note;
+mod settle;
 mod shrink;
 mod shrinking_arena;
 mod speed_up;
@@ -38,6 +39,7 @@ pub const SHRINK: &str = "shrink";
 pub const PLAY_NOTE: &str = "play_note";
 pub const GAP: &str = "gap";
 pub const CRACK: &str = "crack";
+pub const SETTLE: &str = "settle";
 
 /// Per-call context handed to Rules by the simulation.
 pub struct RuleContext<'a> {
@@ -71,6 +73,12 @@ pub trait Rule {
         false
     }
 
+    /// Whether this Rule settles Rings (see the `settle` Rule). The `solid`
+    /// End Condition needs at least one such Rule.
+    fn settles_rings(&self) -> bool {
+        false
+    }
+
     /// Whether this Rule works relative to the Scenario's max speed (see
     /// `RuleContext::max_speed`), so the Scenario must set `ball.max_speed`
     /// rather than take the default.
@@ -97,6 +105,11 @@ pub trait Rule {
         _ctx: &mut RuleContext,
     ) {
     }
+
+    /// Called once per substep after Boundary Hits have been handled and every
+    /// ball is inside the Boundary (a ball grown past it is clamped to fit).
+    /// Rules may add or remove balls here (e.g. settle).
+    fn on_substep_end(&mut self, _state: &mut SimState, _ctx: &mut RuleContext) {}
 }
 
 /// Builds one Rule from its Scenario entry.
@@ -113,6 +126,7 @@ pub fn build(spec: &RuleSpec) -> Result<Box<dyn Rule>, String> {
         PLAY_NOTE => Ok(Box::new(play_note::PlayNote::from_spec(spec)?)),
         GAP => Ok(Box::new(gap::Gap::from_spec(spec)?)),
         CRACK => Ok(Box::new(crack::Crack::from_spec(spec)?)),
+        SETTLE => Ok(Box::new(settle::Settle::from_spec(spec)?)),
         other => Err(format!("unknown Rule '{other}'")),
     }
 }

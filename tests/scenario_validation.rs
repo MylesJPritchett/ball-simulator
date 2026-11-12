@@ -265,3 +265,155 @@ fn crack_has_no_parameters() {
         "{err}"
     );
 }
+
+/// A complete Scenario whose ball (radius 30) is a Ring `thickness` thick.
+fn ring(thickness: &str) -> String {
+    complete().replace(
+        "speed = 900.0",
+        &format!("speed = 900.0\nthickness = {thickness}"),
+    )
+}
+
+#[test]
+fn a_ring_thickness_less_than_its_radius_is_valid() {
+    Scenario::from_toml_str("ring", &ring("10.0")).expect("a valid Ring");
+    Scenario::from_toml_str("ring", &ring("{ min = 4.0, max = 12.0 }")).expect("a valid range");
+}
+
+#[test]
+fn a_ring_thickness_must_be_positive_finite_and_less_than_its_radius() {
+    for bad in ["0.0", "-3.0", "nan", "inf", "30.0", "45.0"] {
+        let err = error_for(&ring(bad));
+        assert!(
+            err.contains("broken")
+                && err.contains("ball.thickness must be greater than 0 and less than ball.radius"),
+            "thickness {bad}: {err}"
+        );
+    }
+}
+
+#[test]
+fn a_ring_thickness_range_must_stay_less_than_the_radius_range() {
+    // Each end alone is fine, but a Seed could draw a thickness of 28 with a
+    // radius of 25.
+    let toml = ring("{ min = 4.0, max = 28.0 }")
+        .replace("radius = 30.0", "radius = { min = 25.0, max = 30.0 }");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("ball.thickness must be less than ball.radius across their ranges"),
+        "{err}"
+    );
+}
+
+/// A complete Scenario with a Peg `peg` in radius round a ball 200 in radius,
+/// made a Ring `thickness` thick (`None` leaves it solid).
+fn with_peg(peg: &str, thickness: Option<&str>) -> String {
+    let toml = complete()
+        .replace(
+            "radius = 460.0",
+            &format!("radius = 460.0\npeg_radius = {peg}"),
+        )
+        .replace("radius = 30.0", "radius = 200.0");
+    match thickness {
+        Some(thickness) => toml.replace(
+            "speed = 900.0",
+            &format!("speed = 900.0\nthickness = {thickness}"),
+        ),
+        None => toml,
+    }
+}
+
+#[test]
+fn a_peg_inside_a_rings_hole_is_valid() {
+    Scenario::from_toml_str("peg", &with_peg("100.0", Some("20.0"))).expect("a valid Peg");
+    Scenario::from_toml_str(
+        "peg",
+        &with_peg("{ min = 50.0, max = 150.0 }", Some("20.0")),
+    )
+    .expect("a valid range");
+}
+
+#[test]
+fn a_peg_radius_must_be_positive_and_finite() {
+    for bad in ["0.0", "-10.0", "nan", "inf"] {
+        let err = error_for(&with_peg(bad, Some("20.0")));
+        assert!(
+            err.contains("broken") && err.contains("arena.peg_radius must be greater than 0"),
+            "Peg {bad}: {err}"
+        );
+    }
+}
+
+#[test]
+fn a_peg_must_leave_room_for_the_rings_hole() {
+    // The hole's radius is 200 - 20 = 180: a Peg that big or bigger fills it.
+    for bad in ["180.0", "250.0"] {
+        let err = error_for(&with_peg(bad, Some("20.0")));
+        assert!(
+            err.contains("arena.peg_radius must be smaller than the Ring's hole"),
+            "Peg {bad}: {err}"
+        );
+    }
+    // Each end alone fits, but a Seed could draw a Peg of 175 round a hole of 170.
+    let toml = with_peg("{ min = 100.0, max = 175.0 }", Some("20.0"))
+        .replace("radius = 200.0", "radius = { min = 190.0, max = 200.0 }");
+    let err = error_for(&toml);
+    assert!(
+        err.contains("arena.peg_radius must be smaller than the Ring's hole")
+            && err.contains("across their ranges"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_peg_needs_a_ring() {
+    let err = error_for(&with_peg("100.0", None));
+    assert!(
+        err.contains("arena.peg_radius needs a Ring ball (set ball.thickness)"),
+        "{err}"
+    );
+}
+
+/// MINIMAL ending `solid`, its ball a Ring 10 thick if `ring`, with `rules`.
+fn solid(ring: bool, rules: &str) -> String {
+    let ball = if ring {
+        MINIMAL.replace("speed = 900.0", "speed = 900.0\nthickness = 10.0")
+    } else {
+        MINIMAL.to_string()
+    };
+    format!("{ball}{rules}\n[end_condition]\nkind = \"solid\"\n")
+}
+
+const GROW_AND_SETTLE: &str =
+    "\n[[rules]]\nkind = \"grow\"\namount = 5.0\n\n[[rules]]\nkind = \"settle\"\n";
+
+#[test]
+fn solid_needs_a_rule_that_settles_rings() {
+    let err = error_for(&solid(true, "\n[[rules]]\nkind = \"grow\"\namount = 5.0\n"));
+    assert!(
+        err.contains("broken")
+            && err.contains("end_condition: End Condition 'solid' needs a Rule that settles Rings"),
+        "{err}"
+    );
+}
+
+#[test]
+fn solid_needs_a_ring_ball() {
+    let err = error_for(&solid(false, GROW_AND_SETTLE));
+    assert!(
+        err.contains("broken")
+            && err.contains("end_condition: End Condition 'solid' needs a Ring ball"),
+        "{err}"
+    );
+}
+
+#[test]
+fn solid_with_a_ring_and_settle_is_valid() {
+    Scenario::from_toml_str("ok", &solid(true, GROW_AND_SETTLE)).expect("a valid Scenario");
+}
+
+#[test]
+fn settle_has_no_parameters() {
+    let err = error_for(&solid(true, &format!("{GROW_AND_SETTLE}speed = 2.0\n")));
+    assert!(err.contains("rules[1]") && err.contains("speed"), "{err}");
+}
